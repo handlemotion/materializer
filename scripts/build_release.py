@@ -12,6 +12,7 @@ FILES = (
     "materializer_core.py",
     "README.md",
     "LICENSE",
+    "docs/development.md",
 )
 
 
