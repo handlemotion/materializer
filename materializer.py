@@ -7,7 +7,6 @@ import os
 import re
 import time
 import uuid
-import weakref
 from collections import defaultdict
 from pathlib import Path
 
@@ -1568,8 +1567,7 @@ def arrange_toolbar(bar):
 
 
 def release_row_limits(bar):
-    for reference, minimum, maximum, policy in getattr(bar, "_row_limits", []):
-        widget = reference()
+    for widget, minimum, maximum, policy in getattr(bar, "_row_limits", []):
         if widget is not None and isValid(widget):
             widget.setMinimumHeight(minimum)
             widget.setMaximumHeight(maximum)
@@ -1602,7 +1600,7 @@ def fit_toolbar_row(bar, height=48):
     for widget in limits:
         bar._row_limits.append(
             (
-                weakref.ref(widget),
+                widget,
                 widget.minimumHeight(),
                 widget.maximumHeight(),
                 widget.sizePolicy(),
