@@ -12,12 +12,13 @@ FILES = (
     "materializer_core.py",
     "README.md",
     "LICENSE",
+    "CHANGELOG.md",
     "docs/development.md",
 )
 
 
 def build():
-    tree = ast.parse((ROOT / "materializer.py").read_text())
+    tree = ast.parse((ROOT / "materializer.py").read_text(encoding="utf-8"))
     version = next(
         ast.literal_eval(node.value)
         for node in tree.body
@@ -28,6 +29,8 @@ def build():
     )
     destination = ROOT / "dist"
     destination.mkdir(exist_ok=True)
+    if version != (ROOT / "version.txt").read_text(encoding="utf-8").strip():
+        raise RuntimeError("Release version does not match version.txt")
     archive = destination / f"materializer-{version}.zip"
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as package:
         for name in FILES:
@@ -40,7 +43,9 @@ def build():
             package.writestr(entry, data)
     checksum = archive.with_suffix(".zip.sha256")
     checksum.write_text(
-        hashlib.sha256(archive.read_bytes()).hexdigest() + "  " + archive.name + "\n"
+        hashlib.sha256(archive.read_bytes()).hexdigest() + "  " + archive.name + "\n",
+        encoding="utf-8",
+        newline="\n",
     )
     print(archive)
     print(checksum)

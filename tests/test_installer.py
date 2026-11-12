@@ -44,6 +44,15 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual((self.target / name).read_text(), "version = 1\n")
         self.assertEqual(len(list(self.target.iterdir())), len(installer.MODULES))
 
+    def test_unicode_paths_and_utf8_source(self):
+        source = self.source / "友達 textures"
+        source.mkdir()
+        for name in installer.MODULES:
+            (source / name).write_text('label = "植物"\n', encoding="utf-8")
+        installer.install_files(source, self.target)
+        for name in installer.MODULES:
+            self.assertEqual((self.target / name).read_text(encoding="utf-8"), 'label = "植物"\n')
+
     def test_reinstall_uses_the_same_files(self):
         installer.install_files(self.source, self.target)
         installer.install_files(self.source, self.target)

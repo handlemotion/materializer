@@ -7,6 +7,7 @@ import os
 import re
 import time
 import uuid
+import weakref
 from collections import defaultdict
 from pathlib import Path
 
@@ -23,7 +24,7 @@ from materializer_core import (
     material_key,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.0"  # x-release-please-version
 
 
 LEGACY = {"phong", "blinn", "lambert", "surfaceShader", "phongE"}
@@ -407,7 +408,7 @@ class MaterialRows(QtWidgets.QWidget):
             check.setAccessibleName("Apply " + p["shader"])
             check.setChecked(p["state"] == "Ready")
             check.setEnabled(p["state"] == "Ready")
-            check.checkStateChanged.connect(lambda *_: self.checkedChanged.emit())
+            check.toggled.connect(lambda *_: self.checkedChanged.emit())
             line.addWidget(check)
             name = QtWidgets.QPushButton(p["shader"])
             name.setCheckable(True)
@@ -686,7 +687,7 @@ class Materializer(QtWidgets.QDialog):
         project = scene.parent.parent if scene.suffix else scene
         if project.is_dir():
             roots.add(str(project))
-        roots = sorted(roots)
+        roots = sorted({str(Path(root).resolve()) for root in roots})
         # Avoid scanning a child again when its parent is already indexed.
         roots = [
             r for r in roots if not any(r != p and Path(r).is_relative_to(Path(p)) for p in roots)
@@ -716,7 +717,7 @@ class Materializer(QtWidgets.QDialog):
             binding = self.bindings.get(binding_key(row["shader"]))
             if binding:
                 if Path(binding["folder"]).is_dir():
-                    folder = Path(binding["folder"])
+                    folder = Path(binding["folder"]).resolve()
                     scoped = TextureIndex(
                         path
                         for items in index.by_group.values()
@@ -972,11 +973,7 @@ class AssignmentPreview(QtWidgets.QDialog):
             check.setAccessibleName("Apply " + p["shader"])
             check.setChecked(c.table.is_checked(i))
             check.setEnabled(p["state"] == "Ready" and not stale)
-            check.checkStateChanged.connect(
-                lambda state, index=i: c.table.set_checked(
-                    index, state == QtCore.Qt.CheckState.Checked
-                )
-            )
+            check.toggled.connect(lambda checked, index=i: c.table.set_checked(index, checked))
             line.addWidget(check)
             disclosure = QtWidgets.QToolButton()
             disclosure.setText(p["shader"])
@@ -1123,6 +1120,7 @@ class QuickBar(MayaQWidgetDockableMixin, QtWidgets.QWidget):
         )
         layout.addStretch(1)
         self.preview = None
+        self._row_limits = []
         self._selection_signature = None
         self._current_meshes = []
         self.scan.setIcon(self.style().standardIcon(pix.SP_BrowserReload))
@@ -1302,7 +1300,14 @@ class QuickBar(MayaQWidgetDockableMixin, QtWidgets.QWidget):
             else "Selection changed. Scan again before applying."
         )
 
+    def floatingChanged(self, floating):
+        if floating:
+            release_row_limits(self)
+        else:
+            QtCore.QTimer.singleShot(0, lambda: fit_toolbar_row(self) if isValid(self) else None)
+
     def closeEvent(self, event):
+        release_row_limits(self)
         self.timer.stop()
         if self.preview:
             self.preview.close()
@@ -1558,3 +1563,58 @@ def arrange_toolbar(bar):
         host.setMinimumHeight(42)
         host.setMaximumHeight(48)
         host.setMaximumWidth(440 if neighbor else 16777215)
+    fit_toolbar_row(bar)
+    QtCore.QTimer.singleShot(0, lambda: fit_toolbar_row(bar) if isValid(bar) else None)
+
+
+def release_row_limits(bar):
+    for reference, minimum, maximum, policy in getattr(bar, "_row_limits", []):
+        widget = reference()
+        if widget is not None and isValid(widget):
+            widget.setMinimumHeight(minimum)
+            widget.setMaximumHeight(maximum)
+            widget.setSizePolicy(policy)
+    bar._row_limits = []
+
+
+def fit_toolbar_row(bar, height=48):
+    """Constrain the allocated dock row, including Maya's tab containers."""
+    release_row_limits(bar)
+    host = bar.parentWidget()
+    if host is None:
+        return
+    container = host
+    while container and not isinstance(container, QtWidgets.QTabWidget):
+        container = container.parentWidget()
+    if container is None:
+        return
+    row = container
+    parent = container.parentWidget()
+    if (
+        isinstance(parent, QtWidgets.QSplitter)
+        and parent.orientation() == QtCore.Qt.Orientation.Horizontal
+    ):
+        row = parent
+    splitter = row.parentWidget()
+    sizes = splitter.sizes() if isinstance(splitter, QtWidgets.QSplitter) else []
+    index = splitter.indexOf(row) if sizes else -1
+    limits = [container, row] if container is not row else [container]
+    for widget in limits:
+        bar._row_limits.append(
+            (
+                weakref.ref(widget),
+                widget.minimumHeight(),
+                widget.maximumHeight(),
+                widget.sizePolicy(),
+            )
+        )
+        widget.setMinimumHeight(42)
+        widget.setMaximumHeight(height)
+        policy = widget.sizePolicy()
+        policy.setVerticalPolicy(QtWidgets.QSizePolicy.Policy.Fixed)
+        widget.setSizePolicy(policy)
+    if index >= 0 and splitter.orientation() == QtCore.Qt.Orientation.Vertical and len(sizes) > 1:
+        recipient = max((i for i in range(len(sizes)) if i != index), key=sizes.__getitem__)
+        sizes[recipient] = max(1, sizes[recipient] + sizes[index] - height)
+        sizes[index] = height
+        splitter.setSizes(sizes)

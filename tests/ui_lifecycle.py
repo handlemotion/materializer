@@ -10,12 +10,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from PySide6 import QtCore, QtGui, QtWidgets
+from qt_host import install_if_needed
 
 base = Path(__file__).resolve().parents[1]
 
 sys.path.insert(0, str(base))
 app = QtWidgets.QApplication([])
 app.setApplicationName("Materializer UI Regression")
+install_if_needed()
 m = runpy.run_path(str(base / "materializer.py"))
 m = m["QuickBar"].__init__.__globals__
 m["OpenMayaUI"] = SimpleNamespace(MQtUtil=SimpleNamespace(mainWindow=lambda: None))
@@ -68,6 +70,40 @@ def flush():
     QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     app.processEvents()
     gc.collect()
+
+
+def geometry_check():
+    window = QtWidgets.QWidget()
+    vertical = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
+    viewport = QtWidgets.QWidget()
+    row = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
+    own = QtWidgets.QTabWidget()
+    neighbor = QtWidgets.QTabWidget()
+    control = QtWidgets.QWidget()
+    own.addTab(control, "Materializer")
+    neighbor.addTab(QtWidgets.QWidget(), "Other toolbar")
+    bar = QtWidgets.QWidget(control)
+    bar._row_limits = []
+    row.addWidget(own)
+    row.addWidget(neighbor)
+    vertical.addWidget(viewport)
+    vertical.addWidget(row)
+    QtWidgets.QVBoxLayout(window).addWidget(vertical)
+    window.resize(800, 900)
+    window.show()
+    vertical.setSizes([450, 450])
+    app.processEvents()
+    before = viewport.height()
+    m["fit_toolbar_row"](bar)
+    app.processEvents()
+    assert row.height() <= 48, row.height()
+    assert viewport.height() > before
+    m["release_row_limits"](bar)
+    assert row.maximumHeight() == 16777215
+    window.close()
+    window.deleteLater()
+    flush()
+    results["geometryCollapsed"] = True
 
 
 def cycle():
@@ -148,5 +184,6 @@ def cycle():
         app.exit(1)
 
 
+geometry_check()
 QtCore.QTimer.singleShot(100, cycle)
 raise SystemExit(app.exec())

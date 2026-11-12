@@ -15,6 +15,13 @@ class MatchingTests(unittest.TestCase):
         self.assertEqual(identify("TV_M.png"), ("Metalness", "tv"))
         self.assertNotEqual(identify("TV_AO.png")[0], "Base color")
 
+    def test_windows_and_unc_paths_use_the_filename(self):
+        for path in (
+            r"C:\Users\Friend\Textures\Plant_BaseColor.png",
+            r"\\server\assets\Plant_BaseColor.png",
+        ):
+            self.assertEqual(identify(path), ("Base color", "plant"))
+
     def test_conflicting_files_are_never_chosen_arbitrarily(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -27,7 +34,7 @@ class MatchingTests(unittest.TestCase):
             index = TextureIndex([a, b])
             self.assertIsNone(index.resolve("/missing/" + a.name)[0])
             b.write_bytes(a.read_bytes())
-            self.assertIn(index.resolve("/missing/" + a.name)[0], (a, b))
+            self.assertIn(index.resolve("/missing/" + a.name)[0], (a.resolve(), b.resolve()))
 
 
 if __name__ == "__main__":

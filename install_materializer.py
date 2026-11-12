@@ -75,6 +75,10 @@ def close_tools(cmds):
 def install(open_toolbar=True):
     import maya.cmds as cmds
     import maya.mel as mel
+
+    if cmds.about(apiVersion=True) < 20260000:
+        raise RuntimeError("Materializer requires Maya 2026 or newer.")
+
     from PySide6 import QtCore, QtGui, QtSvg
 
     source = Path(__file__).resolve().parent
@@ -117,12 +121,15 @@ def install(open_toolbar=True):
     sys.path.insert(0, folder)
     for name in ("materializer", "materializer_core"):
         sys.modules.pop(name, None)
+    for name in MODULES:
+        for cached in (target / "__pycache__").glob(Path(name).stem + ".*.pyc"):
+            cached.unlink()
     importlib.invalidate_caches()
     module = importlib.import_module("materializer")
     legacy_module = target.parent / "material_assistant_tool" / "material_assistant.py"
     if legacy_module.is_file():
         shim = f"import sys\np={folder!r}\nif p not in sys.path: sys.path.insert(0,p)\nfrom materializer import launch, show, toolbar, shutdown\n\ndef restore_workspace():\n    import maya.cmds as cmds\n    from PySide6 import QtCore\n    def remove_legacy_dock():\n        name='MaterialAssistantQuickBarWorkspaceControl'\n        if cmds.workspaceControl(name,query=True,exists=True): cmds.deleteUI(name)\n    QtCore.QTimer.singleShot(0,remove_legacy_dock)\n    return launch()\n"
-        legacy_module.write_text(shim)
+        legacy_module.write_text(shim, encoding="utf-8")
         sys.modules.pop("material_assistant", None)
     command = f"import sys; p={folder!r}; sys.path.insert(0,p) if p not in sys.path else None; import materializer; materializer.launch()"
     shelves = mel.eval("$materializerShelves = $gShelfTopLevel")

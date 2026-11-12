@@ -8,7 +8,7 @@ Download the ZIP from [Releases](https://github.com/handlemotion/materializer/re
 
 To update, download the latest ZIP and run its installer again. It replaces the managed install, keeps your texture choices and removes duplicate launchers. Existing Material Assistant installs are migrated. The downloaded folder can be moved or deleted afterward.
 
-Tested with Maya 2027.2 and Arnold on macOS. Windows and Linux haven’t been verified.
+Supports Maya 2026 and newer with Arnold on Windows and macOS. Maya 2027.2 has been tested in the macOS app. Windows and Qt 6.5/6.8 compatibility are covered by CI fixtures; full Maya on Windows and Maya 2026 still need testing by users. Linux is unverified.
 
 ## Use
 

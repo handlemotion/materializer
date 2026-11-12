@@ -23,7 +23,7 @@ def compact(value):
 
 
 def identify(path):
-    stem = Path(path).stem.lower()
+    stem = Path(str(path).replace("\\", "/")).stem.lower()
     short = re.fullmatch(r"(.+)[_. -](a|n|r|m)(?:[_. -](?:[1248]k|100\d))?", stem)
     if short:
         return {"a": "Base color", "n": "Normal", "r": "Roughness", "m": "Metalness"}[
@@ -50,7 +50,7 @@ class TextureIndex:
         self.by_name = defaultdict(list)
         self.by_group = defaultdict(list)
         for value in paths:
-            path = Path(value)
+            path = Path(value).resolve()
             self.by_name[path.name.casefold()].append(path)
             role, group = identify(path)
             if role:
@@ -59,7 +59,7 @@ class TextureIndex:
     def resolve(self, original):
         path = Path(original)
         if path.is_file():
-            return path, "existing path"
+            return path.resolve(), "existing path"
         filename = original.replace("\\", "/").rsplit("/", 1)[-1]
         matches = list(dict.fromkeys(self.by_name.get(filename.casefold(), [])))
         if len(matches) == 1:
