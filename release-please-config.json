@@ -8,7 +8,13 @@
       "include-v-in-tag": true,
       "bump-minor-pre-major": true,
       "draft": true,
-      "extra-files": [{"type": "generic", "path": "materializer.py"}]
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "materializer.py"
+        }
+      ],
+      "force-tag-creation": true
     }
   }
 }
