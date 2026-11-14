@@ -696,6 +696,7 @@ class Materializer(QtWidgets.QDialog):
         self.scan_button.setEnabled(False)
         self.add_folder.setEnabled(False)
         self.apply_button.setEnabled(False)
+        self.changed.emit()
         self.worker = IndexWorker(roots, self)
         self.worker.ready.connect(self.on_index)
         self.worker.failed.connect(self.on_error)
@@ -778,6 +779,9 @@ class Materializer(QtWidgets.QDialog):
         self.details.setToolTip("\n".join(p["maps"].values()))
 
     def apply(self):
+        if self.worker and self.worker.isRunning():
+            self.set_status("Wait for the scan to finish before applying materials.")
+            return
         if self.scanned_selection and scene_meshes(True) != self.scanned_meshes:
             self.set_status("Selection changed. Scan the selected props before applying.")
             return
@@ -828,6 +832,7 @@ def toolbar_icon(name, ready=False):
     from PySide6 import QtSvg
 
     shapes = {
+        "workspace": '<rect x="3" y="5" width="26" height="22" rx="2"/><path d="M10 5v22M10 16h19" fill="none" stroke="#d5ebff" stroke-width="2"/>',
         "folder": '<path d="M4 9V4h10l3 4h11v20H4z"/><path d="M4 12h24l-3 16H4z"/>',
         "undo": '<path d="M13 5 3 14l10 8v-6h5c5 0 7 3 7 8 5-7 2-14-7-14h-5z"/>',
         "inspect": '<rect x="5" y="4" width="22" height="24" rx="3"/><path d="M10 10h12M10 16h12M10 22h9" fill="none" stroke="#d5ebff" stroke-width="2"/>',
@@ -1102,6 +1107,12 @@ class QuickBar(MayaQWidgetDockableMixin, QtWidgets.QWidget):
         )
         self.apply.setIcon(toolbar_icon("apply", ready=False))
         self.undo = button("Undo last material batch", pix.SP_ArrowBack, controller.undo_last)
+        self.mode = button(
+            "Switch scene / shading workspace",
+            pix.SP_DesktopIcon,
+            lambda: launch("toggle_workspace"),
+        )
+        self.mode.setIcon(toolbar_icon("workspace"))
         self.label = AssignmentLabel("Select props · scan")
         self.label.setMinimumWidth(160)
         self.label.setMaximumWidth(260)
@@ -1143,6 +1154,10 @@ class QuickBar(MayaQWidgetDockableMixin, QtWidgets.QWidget):
         floating = menu.addAction("Float toolbar")
         inspector = menu.addAction("Open inspector…")
         menu.addSeparator()
+        shading = menu.addAction("Shading workspace")
+        scene = menu.addAction("Return to scene workspace")
+        graph = menu.addAction("Graph selected meshes")
+        menu.addSeparator()
         importer = menu.addAction("Import static FBX…")
         updates = menu.addAction("Downloads and updates…")
         action = menu.exec(self.mapToGlobal(point))
@@ -1158,6 +1173,12 @@ class QuickBar(MayaQWidgetDockableMixin, QtWidgets.QWidget):
                 )
         elif action == inspector:
             self.open_inspector()
+        elif action == shading:
+            launch("shading")
+        elif action == scene:
+            launch("scene")
+        elif action == graph:
+            launch("graph")
         elif action == importer:
             choose_static_fbx()
         elif action == updates:
@@ -1380,31 +1401,12 @@ def shutdown():
         cmds.deleteUI(control)
 
 
-_WINDOW = None
-
-
 def show():
-    global _WINDOW
-    # Retain native Maya parenting and a strong reference across runpy invocations.
-    import builtins
-
-    previous = getattr(builtins, "_materializer_window", None)
-    if previous:
-        try:
-            previous.show()
-            previous.raise_()
-            previous.activateWindow()
-            return previous
-        except RuntimeError:
-            pass
-    pointer = OpenMayaUI.MQtUtil.mainWindow()
-    if not pointer or not isinstance(QtWidgets.QApplication.instance(), QtWidgets.QApplication):
-        raise RuntimeError("Open this tool inside the Maya desktop application.")
-    parent = wrapInstance(int(pointer), QtWidgets.QWidget)
-    _WINDOW = Materializer(parent)
-    builtins._materializer_window = _WINDOW
-    _WINDOW.show()
-    return _WINDOW
+    window = controller()
+    window.show()
+    window.raise_()
+    window.activateWindow()
+    return window
 
 
 def import_static_fbx(path):
@@ -1459,11 +1461,61 @@ def choose_static_fbx():
         cmds.warning(str(error))
 
 
+_WORKSPACES = None
+
+
+def workspaces():
+    global _WORKSPACES
+    if _WORKSPACES is None:
+        from materializer_workspaces import WorkspaceSwitch, build_layout
+
+        _WORKSPACES = WorkspaceSwitch(cmds, preferences(), lambda: build_layout(cmds))
+    return _WORKSPACES
+
+
+def switch_workspace(action):
+    from materializer_workspaces import SHADING, graph_selection
+
+    focus = QtWidgets.QApplication.focusWidget()
+    if focus is not None:
+        focus.clearFocus()
+    main = wrapInstance(int(OpenMayaUI.MQtUtil.mainWindow()), QtWidgets.QWidget)
+    main.activateWindow()
+    manager = workspaces()
+    if action == "toggle_workspace":
+        action = "scene" if manager.current() == SHADING else "shading"
+    if action == "scene":
+        manager.leave()
+    else:
+        manager.enter()
+    if action == "graph":
+        import maya.mel as mel
+
+        panel = mel.eval("hyperShadePanelName();")
+        graph_selection(
+            cmds, lambda: mel.eval(f'hyperShadePanelGraphCommand("{panel}", "graphMaterials");')
+        )
+    return manager
+
+
 def launch(action="materials"):
+    from materializer_workspaces import install_menu
+
+    install_menu(cmds)
+    if action in ("shading", "scene", "graph", "toggle_workspace"):
+        try:
+            return switch_workspace(action)
+        except Exception as error:
+            cmds.warning(str(error))
+            return None
     if action == "import":
         return choose_static_fbx()
-    if action == "materials":
+    if action == "toolbar":
         return toolbar()
+    if action in ("apply", "undo"):
+        window = show()
+        window.apply() if action == "apply" else window.undo_last()
+        return window
     window = show()
     if action == "folder":
         if window.plans:
@@ -1472,7 +1524,8 @@ def launch(action="materials"):
             window.scan()
             if window.worker:
                 QtCore.QTimer.singleShot(0, lambda: _choose_after_scan(window))
-    elif scene_meshes(True):
+    elif action == "scan" or (action == "materials" and not window.plans):
+        window.scope.setCurrentIndex(0)
         window.scan()
     return window
 
@@ -1485,18 +1538,35 @@ def _choose_after_scan(window):
 
 
 def restore_workspace():
-    parent = OpenMayaUI.MQtUtil.getCurrentParent()
-    bar = toolbar(restoring=True)
-    pointer = OpenMayaUI.MQtUtil.findControl(bar.objectName())
-    if parent and pointer:
-        OpenMayaUI.MQtUtil.addWidgetToMayaLayout(int(pointer), int(parent))
-    embed_toolbar(bar)
-    # Maya is still assembling the saved docking layout. Moving this control here
-    # creates a temporary floating panel that Maya later empties but cannot close.
-    # Leave placement to Maya; only constrain geometry after restoration returns.
-    QtCore.QTimer.singleShot(0, lambda: fit_toolbar_row(bar) if isValid(bar) else None)
-    bar.timer.start(200)
-    return bar
+    # Retire saved toolbar hosts without constructing another floating widget.
+    name = "MaterializerQuickBarWorkspaceControl"
+    cmds.evalDeferred(
+        lambda: cmds.deleteUI(name) if cmds.workspaceControl(name, exists=True) else None
+    )
+
+
+def controller():
+    import builtins
+
+    window = getattr(builtins, "_materializer_window", None)
+    if window is None or not isValid(window):
+        pointer = OpenMayaUI.MQtUtil.mainWindow()
+        parent = wrapInstance(int(pointer), QtWidgets.QWidget)
+        window = Materializer(parent)
+        builtins._materializer_window = window
+        window.changed.connect(lambda: sync_shelf_actions(window))
+        sync_shelf_actions(window)
+    return window
+
+
+def sync_shelf_actions(window):
+    for action, enabled in (
+        ("apply", window.apply_button.isEnabled()),
+        ("undo", window.undo_button.isEnabled()),
+    ):
+        name = "MaterializerShelf_" + action
+        if cmds.shelfButton(name, exists=True):
+            cmds.shelfButton(name, edit=True, enable=enabled)
 
 
 def embed_toolbar(bar):

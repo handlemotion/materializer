@@ -23,7 +23,7 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: python -m unittest discover -s tests
-      - run: python -m compileall -q materializer.py materializer_core.py install_materializer.py
+      - run: python -m compileall -q materializer.py materializer_core.py materializer_workspaces.py install_materializer.py
       - run: python scripts/build_release.py
   qt:
     strategy:
