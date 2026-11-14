@@ -108,6 +108,36 @@ def check():
             "PASS: default rig material replaceable, skin history unchanged, authored OpenPBR preserved, scoped replacement and Undo work",
             flush=True,
         )
+        tiled = []
+        for role in ("BaseColor", "Normal", "Roughness"):
+            for tile in (1001, 1011):
+                path = root / f"Tiled_{role}.{tile}.png"
+                path.write_bytes(png)
+                tiled.append(path)
+        index = TextureIndex(tiled)
+        row = materializer.inspect_materials([rig_shape])[0]
+        plan = materializer.plan_texture_set(row, index, "tiled")
+        assert plan["state"] == "Ready", plan
+        assert len(plan["maps"]) == 3
+        _, changes = materializer.apply_plans([plan])
+        created = changes[0]["new"]
+        texture = cmds.listConnections(created + ".baseColor", s=True, d=False)[0]
+        token_path = cmds.getAttr(texture + ".fileTextureName")
+        assert "<UDIM>" in token_path
+        assert cmds.getAttr(texture + ".uvTilingMode") == 3
+        assert index.resolve(token_path)[0] is not None
+        assert (
+            materializer.plan_material(materializer.inspect_materials([rig_shape])[0], index)[
+                "state"
+            ]
+            == "Existing shader"
+        )
+        cmds.undo()
+        assert cmds.listConnections(rig_shape, type="shadingEngine") == [group]
+        print(
+            "PASS: multi-row UDIM sets use one node per channel, Mari mode and rescan resolution work",
+            flush=True,
+        )
         print(
             "PASS: selected mesh shaded, shared material on other mesh preserved, color spaces correct, Undo restored assignment",
             flush=True,

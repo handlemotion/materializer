@@ -20,6 +20,6 @@ The toolbar sits beside The Key Machine when it’s docked, or above the timelin
 
 ## Limits
 
-UVs must already match the textures. Packed maps, UDIMs and gloss-only sets need manual setup. Opacity needs its own map. Scenes aren’t saved automatically, and applying materials is one Maya Undo step.
+UVs must already match the textures. Numbered UDIM tiles use one file node per channel with viewport previews. Packed maps and gloss-only sets need manual setup. Opacity needs its own map. Scenes aren’t saved automatically, and applying materials is one Maya Undo step.
 
 MIT licensed. [Development and checks](docs/development.md).

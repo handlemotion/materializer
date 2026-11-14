@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from materializer_core import TextureIndex, identify
+from materializer_core import TextureIndex, collapse_tiles, identify, udim_path
 
 
 class MatchingTests(unittest.TestCase):
@@ -14,6 +14,34 @@ class MatchingTests(unittest.TestCase):
         self.assertEqual(identify("TV_A.png"), ("Base color", "tv"))
         self.assertEqual(identify("TV_M.png"), ("Metalness", "tv"))
         self.assertNotEqual(identify("TV_AO.png")[0], "Base color")
+
+    def test_udim_sets_group_all_rows_without_merging_folders(self):
+        self.assertEqual(identify("robot_BaseColor.1011.png"), ("Base color", "robot"))
+        self.assertEqual(identify("robot_Normal.<UDIM>.png"), ("Normal", "robot"))
+        self.assertIsNone(udim_path("/assets/1001/robot_BaseColor.png"))
+        self.assertIsNone(udim_path("robot_BaseColor.1000.png"))
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            files = []
+            for name in ("robot_BaseColor.1001.png", "robot_BaseColor.1011.png"):
+                p = root / name
+                p.write_bytes(b"tile")
+                files.append(p)
+            self.assertEqual(collapse_tiles(files), [files[0]])
+            index = TextureIndex(files)
+            self.assertEqual(
+                TextureIndex().resolve(str(root / "robot_BaseColor.<UDIM>.png"))[0],
+                files[0].resolve(),
+            )
+            self.assertEqual(
+                index.resolve(str(root / "robot_BaseColor.<UDIM>.png"))[0], files[0].resolve()
+            )
+            other = root / "other" / files[0].name
+            other.parent.mkdir()
+            other.write_bytes(b"different")
+            self.assertEqual(len(collapse_tiles(files + [other])), 2)
+            index = TextureIndex(files + [other])
+            self.assertIsNone(index.resolve("/missing/robot_BaseColor.<UDIM>.png")[0])
 
     def test_windows_and_unc_paths_use_the_filename(self):
         for path in (

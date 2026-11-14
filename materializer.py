@@ -19,8 +19,10 @@ from shiboken6 import isValid, wrapInstance
 from materializer_core import (
     EXTENSIONS,
     TextureIndex,
+    collapse_tiles,
     identify,
     material_key,
+    udim_path,
 )
 
 __version__ = "0.2.2"  # x-release-please-version
@@ -116,7 +118,7 @@ def plan_material(row, index):
             elif all(candidate[1] == "matching texture-set name" for candidate in candidates[role]):
                 candidates[role].append((path, "matching texture-set name"))
     for role, items in candidates.items():
-        unique = list(dict.fromkeys(p for p, _ in items))
+        unique = collapse_tiles(p for p, _ in items)
         if len(unique) == 1:
             plan["maps"][role] = str(unique[0])
             plan["reasons"][role] = items[0][1]
@@ -132,8 +134,6 @@ def plan_material(row, index):
                 plan["reasons"][role] = reason
             else:
                 plan["issues"].append(role + ": " + reason)
-    if any(re.search(r"(?<!\d)100\d(?!\d)|<UDIM>", p, re.I) for p in plan["maps"].values()):
-        plan["issues"].append("UDIM texture set: tile handling requires review by this tool.")
     unsupported = set(plan["maps"]) & {"Glossiness", "Packed ORM"}
     if unsupported:
         plan["issues"].append("Confirm packed channels or gloss conversion before applying.")
@@ -152,7 +152,7 @@ def plan_texture_set(row, index, group):
     for role, path in index.by_group.get(group, []):
         candidates[role].append(str(path))
     for role, paths in candidates.items():
-        paths = list(dict.fromkeys(paths))
+        paths = [str(path) for path in collapse_tiles(paths)]
         if role == "Glossiness" and "Roughness" in candidates:
             continue
         if len(paths) == 1:
@@ -162,8 +162,6 @@ def plan_texture_set(row, index, group):
             p["issues"].append(role + ": multiple maps; choose a folder with one resolution.")
     if set(p["maps"]) & {"Glossiness", "Packed ORM"}:
         p["issues"].append("Packed channels or gloss conversion needs review.")
-    if any(re.search(r"(?<!\d)100\d(?!\d)|<UDIM>", x, re.I) for x in p["maps"].values()):
-        p["issues"].append("UDIM tiles need review.")
     if "Base color" not in p["maps"]:
         p["issues"].append("No base-color map found. Choose a named PBR texture set.")
     p["state"] = "Ready" if not p["issues"] else "Review"
@@ -223,7 +221,10 @@ def _file(path, name, role):
         cmds.connectAttr(uv + "." + attr, node + "." + attr)
     cmds.connectAttr(uv + ".outUV", node + ".uvCoord")
     cmds.connectAttr(uv + ".outUvFilterSize", node + ".uvFilterSize")
-    cmds.setAttr(node + ".fileTextureName", str(path), type="string")
+    pattern = udim_path(path)
+    cmds.setAttr(node + ".fileTextureName", str(pattern or path), type="string")
+    if pattern:
+        cmds.setAttr(node + ".uvTilingMode", 3)
     cmds.setAttr(node + ".ignoreColorSpaceFileRules", True)
     spaces = cmds.colorManagementPrefs(query=True, inputSpaceNames=True)
     colorspace = (
@@ -233,9 +234,8 @@ def _file(path, name, role):
     )
     cmds.setAttr(node + ".colorSpace", colorspace, type="string")
     cmds.setAttr(node + ".alphaIsLuminance", False)
-    if re.search(r"(?<!\d)1001(?!\d)", str(path)):
-        # UDIM sequences require explicit tile handling.
-        raise RuntimeError("UDIM textures require review: " + str(path))
+    if pattern and not cmds.about(batch=True):
+        cmds.ogs(regenerateUVTilePreview=node)
     return node
 
 
@@ -673,7 +673,7 @@ class Materializer(QtWidgets.QDialog):
         for row in self.rows:
             for item in row["files"]:
                 p = Path(item["path"])
-                if p.is_file():
+                if p.is_file() or ("<udim>" in str(p).casefold() and p.parent.is_dir()):
                     roots.add(str(p.parent))
                     for ancestor in p.parents:
                         if re.search(r"assets|sourceimages", ancestor.name, re.I):
