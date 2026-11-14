@@ -14,7 +14,8 @@
           "path": "materializer.py"
         }
       ],
-      "force-tag-creation": true
+      "force-tag-creation": true,
+      "versioning": "always-bump-minor"
     }
   }
 }

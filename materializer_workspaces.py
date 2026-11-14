@@ -73,16 +73,30 @@ class WorkspaceSwitch:
         return True
 
 
-def build_layout(cmds, mel):
+def build_layout(cmds):
     """Arrange native controls only on the first explicit entry into shading mode."""
-    mel.eval("HypershadeWindow;")
-    panel = mel.eval("hyperShadePanelName();")
-    control = cmds.workspaceLayoutManager(parentWorkspaceControl=panel)
-    if not control:
-        raise RuntimeError("Maya did not create Hypershade's workspace control.")
     for name in ("MainPane", "Outliner"):
         if not cmds.workspaceControl(name, exists=True):
             raise RuntimeError("The base workspace is missing " + name + ".")
+    panels = cmds.getPanel(scriptType="hyperShadePanel") or []
+    control = cmds.workspaceLayoutManager(parentWorkspaceControl=panels[0]) if panels else None
+    if control:
+        cmds.workspaceControl(control, edit=True, retain=True)
+    else:
+        control = "MaterializerHypershade"
+        panel = panels[0] if panels else "materializerHyperShadePanel"
+        script = (
+            f"if (!`scriptedPanel -exists {panel}`) "
+            f'scriptedPanel -unParent -type "hyperShadePanel" -label "Hypershade" {panel}; '
+            f"scriptedPanel -edit -parent {control} {panel};"
+        )
+        cmds.workspaceControl(
+            control,
+            label="Hypershade",
+            retain=True,
+            dockToControl=("MainPane", "right"),
+            uiScript="import maya.mel; maya.mel.eval(" + repr(script) + ")",
+        )
     for name in (
         "MayaRenderSetupWindowWorkspaceControl",
         "MayaPropertyEditorWindowWorkspaceControl",
@@ -101,14 +115,15 @@ def build_layout(cmds, mel):
     cmds.workspaceControl(
         "Outliner", edit=True, dockToControl=("MainPane", "left"), resizeWidth=220
     )
-    cmds.workspaceControl(control, edit=True, floating=False, visible=True, collapse=False)
     cmds.workspaceControl(control, edit=True, dockToControl=("MainPane", "right"), resizeWidth=850)
+    cmds.workspaceControl(control, edit=True, visible=True, collapse=False)
+    cmds.workspaceControl("Outliner", edit=True, collapse=True)
     for panel in cmds.getPanel(visiblePanels=True) or []:
         if cmds.getPanel(typeOf=panel) == "modelPanel":
             cmds.modelEditor(panel, edit=True, displayTextures=True)
 
 
-def graph_selection(cmds):
+def graph_selection(cmds, graph):
     selection = cmds.ls(selection=True, long=True) or []
     shapes = []
     for node in cmds.ls(selection=True, objectsOnly=True, long=True) or []:
@@ -122,7 +137,7 @@ def graph_selection(cmds):
         raise RuntimeError("Select meshes or a geometry group first.")
     try:
         cmds.select(list(dict.fromkeys(shapes)), replace=True)
-        cmds.hyperShade(shaderNetworks=True)
+        graph()
     finally:
         if selection:
             cmds.select(selection, replace=True)
@@ -140,7 +155,11 @@ def install_menu(cmds, replace=False):
         ("Shading workspace", "shading"),
         ("Return to scene workspace", "scene"),
         ("Graph selected meshes", "graph"),
-        ("Material toolbar", "materials"),
+        ("Scan selected meshes…", "scan"),
+        ("Review texture assignments…", "materials"),
+        ("Choose textures…", "folder"),
+        ("Apply checked assignments", "apply"),
+        ("Undo material batch", "undo"),
     ):
         cmds.menuItem(
             label=label,

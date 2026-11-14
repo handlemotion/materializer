@@ -27,7 +27,7 @@ try:
         assert cmds.ls(selection=True, long=True) == ["|robot_geo|body_geo|body_geoShape"]
 
     with patch.object(cmds, "hyperShade", side_effect=inspect_graph):
-        graph_selection(cmds)
+        graph_selection(cmds, lambda: cmds.hyperShade(shaderNetworks=True))
     assert cmds.ls(selection=True, long=True) == ["|robot_geo"]
     assert set(cmds.ls(uuid=True)) == before
     assert cmds.xform(body + ".vtx[*]", query=True, translation=True, objectSpace=True) == points
@@ -36,7 +36,7 @@ try:
     original = cmds.ls(selection=True, long=True)
     with patch.object(cmds, "hyperShade", side_effect=RuntimeError("Graph unavailable")):
         try:
-            graph_selection(cmds)
+            graph_selection(cmds, lambda: cmds.hyperShade(shaderNetworks=True))
         except RuntimeError as error:
             assert str(error) == "Graph unavailable"
         else:

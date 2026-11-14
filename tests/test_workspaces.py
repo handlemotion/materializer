@@ -2,7 +2,13 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from materializer_workspaces import PREVIOUS, SHADING, WorkspaceSwitch, graph_selection
+from materializer_workspaces import (
+    PREVIOUS,
+    SHADING,
+    WorkspaceSwitch,
+    build_layout,
+    graph_selection,
+)
 
 
 class Settings:
@@ -189,15 +195,54 @@ class GraphTests(unittest.TestCase):
             getAttr=lambda attr: "orig" in attr,
         )
         with self.assertRaisesRegex(RuntimeError, "Graph unavailable"):
-            graph_selection(cmds)
+            graph_selection(cmds, lambda: cmds.hyperShade(shaderNetworks=True))
         self.assertEqual(selection, original)
 
     def test_empty_selection_does_not_clear_or_rebuild_graph(self):
         cmds = SimpleNamespace(ls=lambda **options: [], select=Mock(), hyperShade=Mock())
         with self.assertRaisesRegex(RuntimeError, "Select meshes"):
-            graph_selection(cmds)
+            graph_selection(cmds, lambda: cmds.hyperShade(shaderNetworks=True))
         cmds.select.assert_not_called()
         cmds.hyperShade.assert_not_called()
+
+
+class DockCreationTests(unittest.TestCase):
+    def test_new_hypershade_starts_docked_and_retained_with_outliner_collapsed(self):
+        self.check_dock([])
+
+    def test_orphaned_native_panel_gets_a_retained_host(self):
+        self.check_dock(["hyperShadePanel1"])
+
+    def check_dock(self, existing_panels):
+        controls = {"MainPane": {}, "Outliner": {}}
+        created = []
+
+        def workspace_control(name, **options):
+            if options.get("exists"):
+                return name in controls
+            if not options.get("edit"):
+                created.append((name, options))
+                controls[name] = dict(options)
+            else:
+                controls[name].update(options)
+
+        def panels(**options):
+            return existing_panels if options.get("scriptType") else []
+
+        cmds = SimpleNamespace(
+            workspaceControl=workspace_control,
+            getPanel=panels,
+            workspaceLayoutManager=lambda **options: None,
+        )
+        build_layout(cmds)
+        self.assertEqual(len(created), 1)
+        name, options = created[0]
+        self.assertEqual(name, "MaterializerHypershade")
+        self.assertEqual(options["dockToControl"], ("MainPane", "right"))
+        self.assertTrue(options["retain"])
+        self.assertNotIn("tearOff", options["uiScript"])
+        self.assertTrue(controls["Outliner"]["collapse"])
+        compile(options["uiScript"], "Hypershade uiScript", "exec")
 
 
 if __name__ == "__main__":

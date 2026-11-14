@@ -4,7 +4,7 @@ Connect texture sets to Arnold materials in Maya. Select a few props, scan, chec
 
 ## Install
 
-Download the ZIP from [Releases](https://github.com/handlemotion/materializer/releases/latest), unzip it, then drag `install_materializer.py` into Maya’s viewport. Keep the three module files beside the installer. A **Materializer** shelf button opens the toolbar.
+Download the ZIP from [Releases](https://github.com/handlemotion/materializer/releases/latest), unzip it, then drag `install_materializer.py` into Maya’s viewport. Keep the three module files beside the installer. The **Materializer** shelf holds the actions.
 
 To update, download the latest ZIP and run its installer again. It replaces the managed install, keeps your texture choices and removes duplicate launchers. Existing Material Assistant installs are migrated. The downloaded folder can be moved or deleted afterward.
 
@@ -12,19 +12,19 @@ Supports Maya 2026 and newer with Arnold on Windows and macOS. Maya 2027.2 has b
 
 ## Use
 
-Select props and click the blue scan button. Click the status or list icon to see which meshes and texture files belong to each material. If a material needs textures, choose its folder. Check the matches, then click the green check to apply. Changing your selection requires another scan.
+Select props and click **Scan** on the Materializer shelf. Review which meshes and texture files belong to each material. Use **Textures** to choose a folder, then **Apply** to connect the checked assignments. **Review** reopens the assignments. Changing your selection requires another scan.
 
 Existing Arnold and OpenPBR shaders are preserved. Legacy Phong, Blinn and Lambert shaders can be converted. The tool connects base color, normal, roughness, metalness, opacity and emission maps. Use **Inspector → Options** to choose a known DirectX normal convention.
 
-The toolbar sits beside The Key Machine when it’s docked, or above the timeline at full width. Right-click for floating mode, updates or static FBX import.
+Actions use native Maya shelf buttons. The assignment window opens when needed; there’s no extra toolbar row.
 
 ## Shading workspace
 
-Click the workspace icon in the toolbar to switch between your scene workspace and **Materializer Shading**. The shading layout puts the native Outliner on the left, viewport in the middle and Hypershade on the right. The **Materializer** menu also has **Return to scene workspace** and **Graph selected meshes**.
+Click **Shading** on the shelf to switch between your scene workspace and **Materializer Shading**. The shading layout puts the viewport beside Hypershade, with the native Outliner collapsed on the left. The **Materializer** menu also has **Return to scene workspace** and **Graph selected meshes**.
 
 The switch saves layout changes before leaving a workspace. Arrange the shading panels as you like; later visits reuse that layout. Materials, geometry and scene files are untouched by workspace switching. You can also choose workspaces through Maya's usual selector.
 
-This feature has headless checks only so far. Its native docking layout still needs an interactive Maya check before release.
+Entry, material graphing and return were checked in Maya 2027.2 on macOS. Full Maya on Windows and Maya 2026 remain unverified.
 
 ## Limits
 

@@ -34,7 +34,7 @@ CI runs portable tests on Windows and Linux with Python 3.11/3.13, plus producti
 
 ## Releases
 
-Use Conventional Commits, such as `fix: ...` or `feat: ...`. After main passes Checks, release-please opens a version PR with the changelog, manifest, version.txt and module version updated together. The release PR gets its own dispatched checks because GitHub’s default bot token doesn’t trigger PR workflows.
+Releases always increment the minor version and stay on 0.x. Use Conventional Commits, such as `fix: ...` or `feat: ...`. After main passes Checks, release-please opens a version PR with the changelog, manifest, version.txt and module version updated together. The release PR gets its own dispatched checks because GitHub’s default bot token doesn’t trigger PR workflows.
 
 Review and merge that PR when its checks pass. After the merged commit passes Checks, release-please creates a draft release. The publish job builds the ZIP, uploads it with the SHA-256 file and publishes the release. A failed publish leaves the draft intact; rerun that failed job. No bot merges PRs automatically.
 
@@ -44,6 +44,6 @@ There’s no automatic code download inside Maya. Users update by running the in
 
 `materializer_workspaces.py` uses `workspaceLayoutManager` and `workspaceControl`. It creates **Materializer Shading** on the first explicit switch, using Maya's rendering workspace as a base, then reuses the saved layout. The previous workspace name lives in Materializer's existing settings. Missing layouts and failed switches leave a route back through Maya's workspace selector.
 
-Workspace restoration must not rearrange controls. Keep docking in the explicit first-entry builder; the toolbar's restore callback only embeds its widget and constrains its row. Do not reparent native top-level windows, hide Maya's main window, or add startup scripts, scene script nodes or polling to make mode switching work.
+Workspace restoration must not rearrange controls. Keep docking in the explicit first-entry builder. Hypershade is created directly in a retained native workspace control, avoiding a temporary floating window. Clear keyboard focus before switching so AppKit does not retain a responder in the old host. Old toolbar restore callbacks retire their saved host after restoration; actions now use native shelf buttons. Do not reparent native top-level windows, hide Maya's main window, or add startup scripts, scene script nodes or polling to make mode switching work.
 
-Portable tests cover unsaved layouts, repeat entry, module reload, manual workspace changes, failure recovery and component selection after graph errors. These checks do not prove native panel placement or OS window behavior. Before releasing, check entry, graphing and return in interactive Maya 2026/2027 on macOS and Windows.
+Portable tests cover unsaved layouts, repeat entry, module reload, manual workspace changes, failure recovery and component selection after graph errors. These checks do not prove native panel placement or OS window behavior. Entry, graphing and return were checked interactively in Maya 2027.2 on macOS. Maya 2026 and full Maya on Windows still need interactive checks.

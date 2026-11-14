@@ -79,7 +79,7 @@ def install(open_toolbar=True):
     if cmds.about(apiVersion=True) < 20260000:
         raise RuntimeError("Materializer requires Maya 2026 or newer.")
 
-    from PySide6 import QtCore, QtGui, QtSvg
+    from PySide6 import QtCore, QtWidgets
 
     source = Path(__file__).resolve().parent
     for name in MODULES:
@@ -105,16 +105,6 @@ def install(open_toolbar=True):
             settings.setValue(key, legacy.value(key))
     settings.sync()
 
-    svg = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><g fill="none" stroke="#b7d4fa" stroke-width="1.8" stroke-linecap="round"><circle cx="16" cy="16" r="11"/><path d="M16 5c-7 6-7 16 0 22M16 5c7 6 7 16 0 22M5 16h22"/></g></svg>'
-    image = QtGui.QImage(64, 64, QtGui.QImage.Format.Format_ARGB32)
-    image.fill(QtCore.Qt.GlobalColor.transparent)
-    painter = QtGui.QPainter(image)
-    QtSvg.QSvgRenderer(QtCore.QByteArray(svg.encode())).render(painter)
-    painter.end()
-    icon = target / "materializer.png"
-    if not image.save(str(icon)):
-        raise RuntimeError("Could not save the Materializer shelf icon.")
-
     folder = str(target)
     if folder in sys.path:
         sys.path.remove(folder)
@@ -131,10 +121,10 @@ def install(open_toolbar=True):
     install_menu(cmds, replace=True)
     legacy_module = target.parent / "material_assistant_tool" / "material_assistant.py"
     if legacy_module.is_file():
-        shim = f"import sys\np={folder!r}\nif p not in sys.path: sys.path.insert(0,p)\nfrom materializer import launch, show, toolbar, shutdown\n\ndef restore_workspace():\n    import maya.cmds as cmds\n    from PySide6 import QtCore\n    def remove_legacy_dock():\n        name='MaterialAssistantQuickBarWorkspaceControl'\n        if cmds.workspaceControl(name,query=True,exists=True): cmds.deleteUI(name)\n    QtCore.QTimer.singleShot(0,remove_legacy_dock)\n    return launch()\n"
+        shim = f"import sys\np={folder!r}\nif p not in sys.path: sys.path.insert(0,p)\nfrom materializer import launch, show, toolbar, shutdown\n\ndef restore_workspace():\n    import maya.cmds as cmds\n    from PySide6 import QtCore\n    def remove_legacy_dock():\n        name='MaterialAssistantQuickBarWorkspaceControl'\n        if cmds.workspaceControl(name,query=True,exists=True): cmds.deleteUI(name)\n    QtCore.QTimer.singleShot(0,remove_legacy_dock)\n    return None\n"
         legacy_module.write_text(shim, encoding="utf-8")
         sys.modules.pop("material_assistant", None)
-    command = f"import sys; p={folder!r}; sys.path.insert(0,p) if p not in sys.path else None; import materializer; materializer.launch()"
+    prefix = f"import sys; p={folder!r}; sys.path.insert(0,p) if p not in sys.path else None; import materializer; "
     shelves = mel.eval("$materializerShelves = $gShelfTopLevel")
     legacy_notes = {
         "Find texture sets and connect Arnold materials",
@@ -154,18 +144,40 @@ def install(open_toolbar=True):
             cmds.deleteUI(tab)
     if not cmds.shelfLayout("Materializer", exists=True):
         cmds.shelfLayout("Materializer", parent=shelves)
-    cmds.shelfButton(
-        parent="Materializer",
-        label="Materializer",
-        image=str(icon),
-        annotation="Materializer: open toolbar",
-        sourceType="python",
-        command=command,
+    actions = (
+        ("Scan", "scan", None, "Scan selected meshes and review texture assignments"),
+        ("Textures", "folder", "folder", "Choose textures for a scanned material"),
+        ("Apply", "apply", "apply", "Apply checked texture assignments"),
+        ("Undo", "undo", "undo", "Undo the last material batch"),
+        ("Shading", "toggle_workspace", "workspace", "Switch between shading and scene workspaces"),
+        ("Graph", "graph", "inspect", "Graph selected meshes in the shading workspace"),
+        ("Review", "materials", "inspect", "Review meshes, materials and texture files"),
     )
+    for label, action, icon_name, description in actions:
+        if icon_name:
+            button_icon = module.toolbar_icon(icon_name, ready=action == "apply")
+        else:
+            button_icon = QtWidgets.QApplication.style().standardIcon(
+                QtWidgets.QStyle.StandardPixmap.SP_BrowserReload
+            )
+        image_path = target / ("materializer_" + action + ".png")
+        if not button_icon.pixmap(64, 64).save(str(image_path)):
+            raise RuntimeError("Could not save the " + label + " shelf icon.")
+        cmds.shelfButton(
+            "MaterializerShelf_" + action,
+            parent="Materializer",
+            enable=action not in ("apply", "undo"),
+            label=label,
+            image=str(image_path),
+            imageOverlayLabel=label,
+            annotation="Materializer: " + description,
+            sourceType="python",
+            command=prefix + f"materializer.launch({action!r})",
+        )
     cmds.shelfTabLayout(shelves, edit=True, selectTab="Materializer")
     mel.eval("saveAllShelves " + json.dumps(shelves) + ";")
     print(f"Materializer {module.__version__} installed in {target}")
-    return module.launch() if open_toolbar else module
+    return module
 
 
 def onMayaDroppedPythonFile(*args):
