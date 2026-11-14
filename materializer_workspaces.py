@@ -154,8 +154,6 @@ def install_menu(cmds, replace=False):
         ("Graph selected meshes", "graph"),
         ("Run on selected meshes", "run"),
         ("Review texture assignments…", "materials"),
-        ("Choose textures…", "folder"),
-        ("Apply checked assignments", "apply"),
         ("Undo material batch", "undo"),
     ):
         cmds.menuItem(
