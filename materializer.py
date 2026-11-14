@@ -23,7 +23,7 @@ from materializer_core import (
     material_key,
 )
 
-__version__ = "0.2.1"  # x-release-please-version
+__version__ = "0.2.2"  # x-release-please-version
 
 
 LEGACY = {"phong", "blinn", "lambert", "surfaceShader", "phongE"}

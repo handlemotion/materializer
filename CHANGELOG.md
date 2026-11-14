@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/handlemotion/materializer/compare/v0.2.1...v0.2.2) (2026-11-14)
+
+
+### Bug Fixes
+
+* allow choosing textures for default and existing shaders ([30157f3](https://github.com/handlemotion/materializer/commit/30157f3db63581118b19ba02a8a820a2f0c03ce2))
+
 ## [0.2.1](https://github.com/handlemotion/materializer/compare/v0.2.0...v0.2.1) (2026-11-14)
 
 
