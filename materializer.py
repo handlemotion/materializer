@@ -52,7 +52,7 @@ def inspect_materials(meshes):
             shaders = (
                 cmds.listConnections(sg + ".surfaceShader", source=True, destination=False) or []
             )
-            if not shaders or shaders[0] == "lambert1":
+            if not shaders:
                 continue
             shader = shaders[0]
             row = by_shader.setdefault(
@@ -79,6 +79,11 @@ def inspect_materials(meshes):
 def plan_material(row, index):
     plan = dict(row, maps={}, reasons={}, issues=[], state="Needs textures")
     if row["type"] not in LEGACY:
+        if not row["files"]:
+            plan["issues"].append(
+                "No textures connected. Choose textures to create an Arnold material for the scanned mesh parts."
+            )
+            return plan
         plan["state"] = "Existing shader"
         for item in row["files"]:
             role, _ = identify(item["path"])
@@ -143,9 +148,6 @@ def plan_material(row, index):
 def plan_texture_set(row, index, group):
     """An explicit user choice replaces name inference, never scene assignment scope."""
     p = dict(row, maps={}, reasons={}, issues=[], state="Review", explicit_group=group)
-    if row["type"] not in LEGACY:
-        p["issues"] = ["Existing " + row["type"] + " material is preserved."]
-        return p
     candidates = defaultdict(list)
     for role, path in index.by_group.get(group, []):
         candidates[role].append(str(path))
@@ -582,9 +584,6 @@ class Materializer(QtWidgets.QDialog):
             self.set_status("Select a material row first.")
             return
         row = self.rows[i]
-        if row["type"] not in LEGACY:
-            self.set_status("This material already has an authored shader; it is preserved.")
-            return
         last = preferences().value("lastTextureFolder", "")
         folder = QtWidgets.QFileDialog.getExistingDirectory(
             self, "Textures for " + row["shader"], last
@@ -762,7 +761,7 @@ class Materializer(QtWidgets.QDialog):
         parts = [
             f"<h3>{escape(p['shader'])}</h3>",
             f"<p>{escape(p['type'])}"
-            + (" → Arnold Standard Surface" if p["type"] in LEGACY else "")
+            + (" → Arnold Standard Surface" if p["state"] == "Ready" else "")
             + f"<br>{len(p['shapes'])} meshes · {escape(p['state'])}</p>",
         ]
         for role, path in p["maps"].items():
@@ -952,7 +951,7 @@ class AssignmentPreview(QtWidgets.QDialog):
             if stale
             else f"{n} scanned mesh part"
             + ("s" if n != 1 else "")
-            + ". Checked rows create Arnold shaders; existing shaders stay as they are."
+            + ". Checked rows assign new Arnold materials to scanned mesh parts. Original shaders are kept."
         )
         actions = {
             "Ready": "Create Arnold shader",
@@ -1044,10 +1043,7 @@ class AssignmentPreview(QtWidgets.QDialog):
 
     def update_actions(self):
         i = self.current_index
-        c = self.bar.controller
-        self.textures.setEnabled(
-            i is not None and c.plans[i]["type"] in LEGACY and not self.bar.selection_changed()
-        )
+        self.textures.setEnabled(i is not None and not self.bar.selection_changed())
 
     def choose_textures(self):
         if self.current_index is None:
@@ -1224,9 +1220,7 @@ class QuickBar(MayaQWidgetDockableMixin, QtWidgets.QWidget):
         busy = bool(c.worker and c.worker.isRunning())
         stale = self.selection_changed()
         self.scan.setEnabled(not busy)
-        self.textures.setEnabled(
-            any(p["type"] in LEGACY for p in c.plans) and not busy and not stale
-        )
+        self.textures.setEnabled(bool(c.plans) and not busy and not stale)
         ready = c.apply_button.isEnabled() and not busy and not stale
         self.apply.setEnabled(ready)
         self.apply.setIcon(toolbar_icon("apply", ready=ready))
