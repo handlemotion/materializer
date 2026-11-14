@@ -7,7 +7,7 @@ from materializer_workspaces import (
     SHADING,
     WorkspaceSwitch,
     build_layout,
-    graph_selection,
+    material_graph_nodes,
 )
 
 
@@ -81,10 +81,10 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(self.native.live, "artist's shading arrangement")
         self.assertEqual(self.build.call_count, 1)
 
-    def test_first_build_cannot_overwrite_the_rendering_base(self):
-        base_before = self.native.saved["Rendering - Standard"]
+    def test_first_build_cannot_overwrite_the_general_base(self):
+        base_before = self.native.saved["General"]
         self.switch.enter()
-        self.assertEqual(self.native.saved["Rendering - Standard"], base_before)
+        self.assertEqual(self.native.saved["General"], base_before)
         self.assertEqual(self.native.saved[SHADING], "shading layout")
 
     def test_failed_build_when_starting_in_base_restores_saved_artist_layout(self):
@@ -167,54 +167,54 @@ class WorkspaceTests(unittest.TestCase):
 
 
 class GraphTests(unittest.TestCase):
-    def test_graph_failure_restores_component_selection_and_skips_intermediate_shapes(self):
-        original = ["|robot|body.f[2:5]", "|robot|control"]
-        selection = list(original)
-
-        def ls(**options):
-            return (
-                ["|robot|body", "|robot|control"] if options.get("objectsOnly") else list(selection)
-            )
-
-        def select(nodes=None, **options):
-            selection[:] = [] if options.get("clear") else nodes
-
-        def graph(**options):
-            self.assertEqual(options, {"shaderNetworks": True})
-            self.assertEqual(selection, ["|robot|body|shape"])
-            raise RuntimeError("Graph unavailable")
-
+    def test_material_graph_follows_surface_shader_and_not_rig_connections(self):
+        connections = {
+            "bodyShape": ["bodySG"],
+            "screenShape": ["screenSG"],
+            "bodySG.surfaceShader": ["body_mat"],
+            "screenSG.surfaceShader": ["screen_mat"],
+        }
+        histories = {
+            "body_mat": ["body_mat", "body_baseColor", "body_uv"],
+            "screen_mat": ["screen_mat", "screen_baseColor", "screen_uv"],
+        }
         cmds = SimpleNamespace(
-            ls=ls,
-            select=select,
-            hyperShade=graph,
-            nodeType=lambda node: "transform",
-            listRelatives=lambda node, **options: (
-                ["|robot|body|shape", "|robot|body|orig"] if node.endswith("body") else []
-            ),
-            getAttr=lambda attr: "orig" in attr,
+            listConnections=lambda node, **options: connections[node],
+            listHistory=lambda node, **options: histories[node],
+            select=Mock(),
         )
-        with self.assertRaisesRegex(RuntimeError, "Graph unavailable"):
-            graph_selection(cmds, lambda: cmds.hyperShade(shaderNetworks=True))
-        self.assertEqual(selection, original)
-
-    def test_empty_selection_does_not_clear_or_rebuild_graph(self):
-        cmds = SimpleNamespace(ls=lambda **options: [], select=Mock(), hyperShade=Mock())
-        with self.assertRaisesRegex(RuntimeError, "Select meshes"):
-            graph_selection(cmds, lambda: cmds.hyperShade(shaderNetworks=True))
+        nodes = material_graph_nodes(cmds, ["bodyShape", "screenShape"])
+        self.assertEqual(
+            set(nodes),
+            {
+                "bodySG",
+                "screenSG",
+                "body_mat",
+                "screen_mat",
+                "body_baseColor",
+                "body_uv",
+                "screen_baseColor",
+                "screen_uv",
+            },
+        )
         cmds.select.assert_not_called()
-        cmds.hyperShade.assert_not_called()
+
+    def test_unassigned_mesh_has_no_graph_nodes(self):
+        cmds = SimpleNamespace(listConnections=lambda *args, **options: None)
+        self.assertEqual(material_graph_nodes(cmds, ["unassignedShape"]), [])
 
 
 class DockCreationTests(unittest.TestCase):
-    def test_new_hypershade_starts_docked_and_retained_with_outliner_collapsed(self):
-        self.check_dock([])
+    def test_material_graph_starts_docked_without_hypershade(self):
+        self.check_dock(False)
 
-    def test_orphaned_native_panel_gets_a_retained_host(self):
-        self.check_dock(["hyperShadePanel1"])
+    def test_retained_graph_host_is_reused(self):
+        self.check_dock(True)
 
-    def check_dock(self, existing_panels):
-        controls = {"MainPane": {}, "Outliner": {}}
+    def check_dock(self, retained):
+        controls = {"MainPane": {}, "Outliner": {}, "AttributeEditor": {}}
+        if retained:
+            controls["MaterializerNodes"] = {}
         created = []
 
         def workspace_control(name, **options):
@@ -226,23 +226,18 @@ class DockCreationTests(unittest.TestCase):
             else:
                 controls[name].update(options)
 
-        def panels(**options):
-            return existing_panels if options.get("scriptType") else []
-
-        cmds = SimpleNamespace(
-            workspaceControl=workspace_control,
-            getPanel=panels,
-            workspaceLayoutManager=lambda **options: None,
-        )
+        cmds = SimpleNamespace(workspaceControl=workspace_control, getPanel=lambda **options: [])
         build_layout(cmds)
-        self.assertEqual(len(created), 1)
-        name, options = created[0]
-        self.assertEqual(name, "MaterializerHypershade")
-        self.assertEqual(options["dockToControl"], ("MainPane", "right"))
-        self.assertTrue(options["retain"])
-        self.assertNotIn("tearOff", options["uiScript"])
+        self.assertEqual(len(created), 0 if retained else 1)
+        if not retained:
+            name, options = created[0]
+            self.assertEqual(name, "MaterializerNodes")
+            self.assertEqual(options["dockToControl"], ("MainPane", "right"))
+            self.assertTrue(options["retain"])
+            self.assertNotIn("hyperShade", options["uiScript"])
+            compile(options["uiScript"], "Node Editor uiScript", "exec")
         self.assertTrue(controls["Outliner"]["collapse"])
-        compile(options["uiScript"], "Hypershade uiScript", "exec")
+        self.assertFalse(controls["AttributeEditor"]["collapse"])
 
 
 if __name__ == "__main__":

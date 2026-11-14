@@ -14,6 +14,7 @@ For the scene and UI checks, use Maya’s `mayapy` executable.
 ```sh
 mayapy tests/maya_regression.py
 mayapy tests/ui_lifecycle.py
+mayapy tests/maya_run_regression.py
 ```
 
 The scene test creates temporary meshes and textures. The UI test uses fixture data in a separate process and exercises the production widgets with Maya’s Qt build. Neither opens an artist’s scene.
@@ -42,8 +43,8 @@ There’s no automatic code download inside Maya. Users update by running the in
 
 ## Shading workspace
 
-`materializer_workspaces.py` uses `workspaceLayoutManager` and `workspaceControl`. It creates **Materializer Shading** on the first explicit switch, using Maya's rendering workspace as a base, then reuses the saved layout. The previous workspace name lives in Materializer's existing settings. Missing layouts and failed switches leave a route back through Maya's workspace selector.
+`materializer_workspaces.py` uses `workspaceLayoutManager` and `workspaceControl`. It creates **Materializer Shading** on the first explicit switch, using Maya's General workspace as a base, then reuses the saved layout. The previous workspace name lives in Materializer's existing settings. Missing layouts and failed switches leave a route back through Maya's workspace selector.
 
-Workspace restoration must not rearrange controls. Keep docking in the explicit first-entry builder. Hypershade is created directly in a retained native workspace control, avoiding a temporary floating window. Clear keyboard focus before switching so AppKit does not retain a responder in the old host. Old toolbar restore callbacks retire their saved host after restoration; actions now use native shelf buttons. Do not reparent native top-level windows, hide Maya's main window, or add startup scripts, scene script nodes or polling to make mode switching work.
+Workspace restoration must not rearrange controls. Keep docking in the explicit first-entry builder. The Node Editor is created directly in a retained native workspace control, with the Attribute Editor alongside it. Shading Mode never opens Hypershade. An empty-scene native Hypershade interaction reproduced `EXC_BAD_ACCESS` in `QMacAccessibilityElement dealloc` under LLDB, with Materializer absent from `sys.modules`. Keeping Hypershade out of this layout avoids the reproduced panel path; it is not a Qt repair. Clear keyboard focus before switching so AppKit does not retain a responder in the old host. Old toolbar restore callbacks retire their saved host after restoration; actions now use native shelf buttons. Do not reparent native top-level windows, hide Maya's main window, or add startup scripts, scene script nodes or polling to make mode switching work.
 
-Portable tests cover unsaved layouts, repeat entry, module reload, manual workspace changes, failure recovery and component selection after graph errors. These checks do not prove native panel placement or OS window behavior. Entry, graphing and return were checked interactively in Maya 2027.2 on macOS. Maya 2026 and full Maya on Windows still need interactive checks.
+Portable tests cover unsaved layouts, repeat entry, module reload, manual workspace changes, failure recovery and material graph discovery without changing the selection. These checks do not prove native panel placement or OS window behavior. The Run integration check exercises the real index worker, selected-mesh assignment, Undo, a changed selection during scanning and a basic OpenPBR shader with a chosen texture set. Maya 2026 and full Maya on Windows still need interactive checks.

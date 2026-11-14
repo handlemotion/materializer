@@ -1,6 +1,6 @@
 # Materializer
 
-Connect texture sets to Arnold materials in Maya. Select a few props, scan, check the assignments and apply. I built this because wiring the same texture nodes by hand gets old pretty quickly.
+Connect texture sets to Arnold materials in Maya. Select a few props and run. I built this because wiring the same texture nodes by hand gets old pretty quickly.
 
 ## Install
 
@@ -12,7 +12,7 @@ Supports Maya 2026 and newer with Arnold on Windows and macOS. Maya 2027.2 has b
 
 ## Use
 
-Select props and click **Scan** on the Materializer shelf. Review which meshes and texture files belong to each material. Use **Textures** to choose a folder, then **Apply** to connect the checked assignments. **Review** reopens the assignments. Changing your selection requires another scan.
+Select props and click **Run** on the Materializer shelf. Confident texture matches are connected automatically. If textures are missing, choose a folder; uncertain matches open the assignment review. **Undo** reverses the last material batch. **Materializer → Review texture assignments** opens meshes, materials and filenames when you need details.
 
 Existing Arnold and OpenPBR shaders are preserved. Legacy Phong, Blinn and Lambert shaders can be converted. The tool connects base color, normal, roughness, metalness, opacity and emission maps. Use **Inspector → Options** to choose a known DirectX normal convention.
 
@@ -20,11 +20,11 @@ Actions use native Maya shelf buttons. The assignment window opens when needed; 
 
 ## Shading workspace
 
-Click **Shading** on the shelf to switch between your scene workspace and **Materializer Shading**. The shading layout puts the viewport beside Hypershade, with the native Outliner collapsed on the left. The **Materializer** menu also has **Return to scene workspace** and **Graph selected meshes**.
+Click **Shading** on the shelf to switch between your scene workspace and **Materializer Shading**. The shading layout puts the viewport beside Maya’s Node Editor and Attribute Editor, with the Outliner collapsed on the left. The **Materializer** menu also has **Return to scene workspace** and **Graph selected meshes**.
 
 The switch saves layout changes before leaving a workspace. Arrange the shading panels as you like; later visits reuse that layout. Materials, geometry and scene files are untouched by workspace switching. You can also choose workspaces through Maya's usual selector.
 
-Entry, material graphing and return were checked in Maya 2027.2 on macOS. Full Maya on Windows and Maya 2026 remain unverified.
+The workspace uses the native Node Editor because interacting with Hypershade reproduced a Qt accessibility crash in Maya 2027.2 on macOS, even with Materializer unloaded. This avoids that panel; it does not patch Maya’s Qt libraries. Full Maya on Windows and Maya 2026 remain unverified.
 
 ## Limits
 

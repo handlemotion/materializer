@@ -469,6 +469,7 @@ class Materializer(QtWidgets.QDialog):
         self.scanned_meshes = []
         self.scanned_selection = True
         self._closing = False
+        self._run_requested = False
         self.setStyleSheet("""QDialog{background:#292b2e;color:#f1f2f4} QLabel{color:#f1f2f4}
         QPushButton{padding:8px 14px;background:#3b4047;color:#f1f2f4;border:1px solid #515862;border-radius:5px}
         QPushButton:hover{background:#47515e} QPushButton:disabled{color:#9098a5;background:#33363a}
@@ -541,7 +542,7 @@ class Materializer(QtWidgets.QDialog):
         self.undo_button.setEnabled(False)
         self.undo_button.clicked.connect(self.undo_last)
         footer.addWidget(self.undo_button)
-        self.apply_button = QtWidgets.QPushButton("Apply ready materials")
+        self.apply_button = QtWidgets.QPushButton("Run checked materials")
         self.apply_button.setObjectName("primary")
         self.apply_button.setEnabled(False)
         self.apply_button.clicked.connect(self.apply)
@@ -586,7 +587,9 @@ class Materializer(QtWidgets.QDialog):
         row = self.rows[i]
         last = preferences().value("lastTextureFolder", "")
         folder = QtWidgets.QFileDialog.getExistingDirectory(
-            self, "Textures for " + row["shader"], last
+            self if self.isVisible() else self.parentWidget(),
+            "Textures for " + row["shader"],
+            last,
         )
         if not folder:
             return
@@ -650,6 +653,45 @@ class Materializer(QtWidgets.QDialog):
         )
         return True
 
+    def run(self):
+        if self.worker and self.worker.isRunning():
+            return
+        self.scope.setCurrentIndex(0)
+        self._run_requested = True
+        self.scan()
+        if not self.scanned_meshes:
+            self._run_requested = False
+            self.show()
+            self.raise_()
+
+    def finish_run(self):
+        if self._closing:
+            self._run_requested = False
+        if not self._run_requested:
+            return
+        self._run_requested = False
+        if scene_meshes(True) != self.scanned_meshes:
+            self.set_status("Selection changed. Run again on the selected meshes.")
+            return
+        unresolved = [
+            i
+            for i, plan in enumerate(self.plans)
+            if plan["state"] not in ("Ready", "Existing shader", "Applied")
+        ]
+        if len(unresolved) == 1:
+            self.table.selectRow(unresolved[0])
+            self.choose_root()
+        if any(p["state"] not in ("Ready", "Existing shader", "Applied") for p in self.plans):
+            self.show()
+            self.raise_()
+            self.set_status("Choose textures for unmatched rows, then Run again.")
+            return
+        if any(p["state"] == "Ready" for p in self.plans):
+            self.apply()
+        else:
+            self.set_status("Selected meshes already have materials. Nothing changed.")
+        cmds.inViewMessage(amg=self.status.text(), pos="topCenter", fade=True)
+
     def scan(self):
         if self.worker and self.worker.isRunning():
             return
@@ -700,12 +742,19 @@ class Materializer(QtWidgets.QDialog):
         self.worker = IndexWorker(roots, self)
         self.worker.ready.connect(self.on_index)
         self.worker.failed.connect(self.on_error)
+        if self._run_requested:
+            self.worker.finished.connect(self.finish_run)
         self.worker.start()
 
     def on_error(self, message):
+        if self._run_requested:
+            self._run_requested = False
+            self.show()
+            self.raise_()
         self.set_status("Scan failed: " + message)
         self.scan_button.setEnabled(True)
         self.add_folder.setEnabled(True)
+        self.changed.emit()
 
     def on_index(self, index, elapsed):
         if self._closing or self.sender() is not self.worker:
@@ -747,7 +796,7 @@ class Materializer(QtWidgets.QDialog):
 
     def update_action(self, *_):
         n = sum(self.table.is_checked(i) for i in range(self.table.rowCount()))
-        self.apply_button.setText(f"Apply {n} material" + ("s" if n != 1 else ""))
+        self.apply_button.setText(f"Run {n} material" + ("s" if n != 1 else ""))
         self.apply_button.setEnabled(n > 0 and self.scan_button.isEnabled())
         self.changed.emit()
 
@@ -806,12 +855,14 @@ class Materializer(QtWidgets.QDialog):
             self.set_status(
                 "Other scene edits happened afterward. Use Maya’s Undo history to return to the material change."
             )
-            return
+            return False
         cmds.undo()
         self.undo_button.setEnabled(False)
         self.scan()
+        return True
 
     def closeEvent(self, event):
+        self._run_requested = False
         if self.worker and self.worker.isRunning():
             self.worker.requestInterruption()
             self.set_status("Stopping file scan…")
@@ -1476,7 +1527,7 @@ def workspaces():
 
 
 def switch_workspace(action):
-    from materializer_workspaces import SHADING, graph_selection
+    from materializer_workspaces import NODE_EDITOR, SHADING, material_graph_nodes
 
     focus = QtWidgets.QApplication.focusWidget()
     if focus is not None:
@@ -1491,16 +1542,26 @@ def switch_workspace(action):
     else:
         manager.enter()
     if action == "graph":
-        import maya.mel as mel
-
-        panel = mel.eval("hyperShadePanelName();")
-        graph_selection(
-            cmds, lambda: mel.eval(f'hyperShadePanelGraphCommand("{panel}", "graphMaterials");')
-        )
+        nodes = material_graph_nodes(cmds, scene_meshes(True))
+        if not nodes:
+            raise RuntimeError("Select meshes or a geometry group first.")
+        undo_enabled = cmds.undoInfo(query=True, state=True)
+        cmds.undoInfo(stateWithoutFlush=False)
+        try:
+            cmds.nodeEditor(
+                NODE_EDITOR, edit=True, addNewNodes=False, showShapes=False, showSGShapes=False
+            )
+            previous = cmds.nodeEditor(NODE_EDITOR, query=True, getNodeList=True) or []
+            if previous:
+                cmds.nodeEditor(NODE_EDITOR, edit=True, removeNode=previous)
+            cmds.nodeEditor(NODE_EDITOR, edit=True, addNode=nodes)
+            cmds.nodeEditor(NODE_EDITOR, edit=True, layout=True, frameAll=True)
+        finally:
+            cmds.undoInfo(stateWithoutFlush=undo_enabled)
     return manager
 
 
-def launch(action="materials"):
+def launch(action="run"):
     from materializer_workspaces import install_menu
 
     install_menu(cmds)
@@ -1510,13 +1571,25 @@ def launch(action="materials"):
         except Exception as error:
             cmds.warning(str(error))
             return None
+    if action == "run":
+        cmds.inViewMessage(amg="Finding textures…", pos="topCenter", fade=True)
+        window = controller()
+        window.run()
+        return window
     if action == "import":
         return choose_static_fbx()
     if action == "toolbar":
         return toolbar()
-    if action in ("apply", "undo"):
+    if action == "undo":
+        window = controller()
+        if window.undo_last():
+            cmds.inViewMessage(amg="Materializer batch undone.", pos="topCenter", fade=True)
+        else:
+            cmds.warning(window.status.text())
+        return window
+    if action == "apply":
         window = show()
-        window.apply() if action == "apply" else window.undo_last()
+        window.apply()
         return window
     window = show()
     if action == "folder":
@@ -1563,6 +1636,7 @@ def controller():
 
 def sync_shelf_actions(window):
     for action, enabled in (
+        ("run", window.scan_button.isEnabled()),
         ("apply", window.apply_button.isEnabled()),
         ("undo", window.undo_button.isEnabled()),
     ):
