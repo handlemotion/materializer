@@ -3,6 +3,8 @@
 SHADING = "Materializer Shading"
 PREVIOUS = "sceneWorkspace"
 MENU = "MaterializerWorkspaceMenu"
+NODE_PANEL = "materializerNodePanel"
+NODE_EDITOR = NODE_PANEL + "NodeEditorEd"
 
 
 class WorkspaceSwitch:
@@ -22,9 +24,9 @@ class WorkspaceSwitch:
         if previous == SHADING:
             return False
         layouts = self.cmds.workspaceLayoutManager(listLayouts=True) or []
-        base = next((name for name in ("Rendering - Standard", "General") if name in layouts), None)
+        base = "General" if "General" in layouts else None
         if SHADING not in layouts and base is None:
-            raise RuntimeError("Maya's Rendering - Standard or General workspace is required.")
+            raise RuntimeError("Maya's General workspace is required.")
         self.switching = True
         try:
             if self.cmds.workspaceLayoutManager(modified=previous):
@@ -78,21 +80,17 @@ def build_layout(cmds):
     for name in ("MainPane", "Outliner"):
         if not cmds.workspaceControl(name, exists=True):
             raise RuntimeError("The base workspace is missing " + name + ".")
-    panels = cmds.getPanel(scriptType="hyperShadePanel") or []
-    control = cmds.workspaceLayoutManager(parentWorkspaceControl=panels[0]) if panels else None
-    if control:
-        cmds.workspaceControl(control, edit=True, retain=True)
+    control = "MaterializerNodes"
+    script = (
+        f'if (!`scriptedPanel -exists {NODE_PANEL}`) nodeEditorPanel("{NODE_PANEL}"); '
+        f"scriptedPanel -edit -parent {control} {NODE_PANEL};"
+    )
+    if cmds.workspaceControl(control, exists=True):
+        cmds.workspaceControl(control, edit=True, restore=True, visible=True)
     else:
-        control = "MaterializerHypershade"
-        panel = panels[0] if panels else "materializerHyperShadePanel"
-        script = (
-            f"if (!`scriptedPanel -exists {panel}`) "
-            f'scriptedPanel -unParent -type "hyperShadePanel" -label "Hypershade" {panel}; '
-            f"scriptedPanel -edit -parent {control} {panel};"
-        )
         cmds.workspaceControl(
             control,
-            label="Hypershade",
+            label="Material graph",
             retain=True,
             dockToControl=("MainPane", "right"),
             uiScript="import maya.mel; maya.mel.eval(" + repr(script) + ")",
@@ -106,7 +104,6 @@ def build_layout(cmds):
         "polyTexturePlacementPanel1Window",
         "SSEwindow",
         "outlinerPanel3Window",
-        "AttributeEditor",
         "ChannelBoxLayerEditor",
     ):
         if cmds.workspaceControl(name, exists=True):
@@ -117,32 +114,32 @@ def build_layout(cmds):
     )
     cmds.workspaceControl(control, edit=True, dockToControl=("MainPane", "right"), resizeWidth=850)
     cmds.workspaceControl(control, edit=True, visible=True, collapse=False)
+    if cmds.workspaceControl("AttributeEditor", exists=True):
+        cmds.workspaceControl(
+            "AttributeEditor", edit=True, restore=True, visible=True, collapse=False
+        )
+        cmds.workspaceControl(
+            "AttributeEditor", edit=True, dockToControl=(control, "right"), resizeWidth=350
+        )
     cmds.workspaceControl("Outliner", edit=True, collapse=True)
     for panel in cmds.getPanel(visiblePanels=True) or []:
         if cmds.getPanel(typeOf=panel) == "modelPanel":
             cmds.modelEditor(panel, edit=True, displayTextures=True)
 
 
-def graph_selection(cmds, graph):
-    selection = cmds.ls(selection=True, long=True) or []
-    shapes = []
-    for node in cmds.ls(selection=True, objectsOnly=True, long=True) or []:
-        candidates = (
-            [node]
-            if cmds.nodeType(node) == "mesh"
-            else (cmds.listRelatives(node, allDescendents=True, type="mesh", fullPath=True) or [])
-        )
-        shapes.extend(s for s in candidates if not cmds.getAttr(s + ".intermediateObject"))
-    if not shapes:
-        raise RuntimeError("Select meshes or a geometry group first.")
-    try:
-        cmds.select(list(dict.fromkeys(shapes)), replace=True)
-        graph()
-    finally:
-        if selection:
-            cmds.select(selection, replace=True)
-        else:
-            cmds.select(clear=True)
+def material_graph_nodes(cmds, shapes):
+    nodes = set()
+    for shape in shapes:
+        for group in cmds.listConnections(shape, type="shadingEngine") or []:
+            shaders = (
+                cmds.listConnections(group + ".surfaceShader", source=True, destination=False) or []
+            )
+            if shaders:
+                nodes.add(group)
+            for shader in shaders:
+                nodes.add(shader)
+                nodes.update(cmds.listHistory(shader, pruneDagObjects=True) or [])
+    return sorted(nodes)
 
 
 def install_menu(cmds, replace=False):
@@ -155,7 +152,7 @@ def install_menu(cmds, replace=False):
         ("Shading workspace", "shading"),
         ("Return to scene workspace", "scene"),
         ("Graph selected meshes", "graph"),
-        ("Scan selected meshes…", "scan"),
+        ("Run on selected meshes", "run"),
         ("Review texture assignments…", "materials"),
         ("Choose textures…", "folder"),
         ("Apply checked assignments", "apply"),

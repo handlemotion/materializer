@@ -135,9 +135,8 @@ def install(open_toolbar=True):
         if not cmds.shelfLayout(tab, exists=True):
             continue
         for button in cmds.shelfLayout(tab, query=True, childArray=True) or []:
-            if cmds.objectTypeUI(button) == "separator":
-                if button.rsplit("|", 1)[-1].startswith("MaterializerShelfDivider_"):
-                    cmds.deleteUI(button)
+            if button.rsplit("|", 1)[-1].startswith("MaterializerShelfDivider_"):
+                cmds.deleteUI(button)
                 continue
             if cmds.objectTypeUI(button) != "shelfButton":
                 continue
@@ -149,16 +148,13 @@ def install(open_toolbar=True):
     if not cmds.shelfLayout("Materializer", exists=True):
         cmds.shelfLayout("Materializer", parent=shelves)
     actions = (
-        ("Scan", "scan", None, "Scan selected meshes and review texture assignments"),
-        ("Textures", "folder", "folder", "Choose textures for a scanned material"),
-        ("Review", "materials", "review", "Review meshes, materials and texture files"),
-        ("Apply", "apply", "apply", "Apply checked texture assignments"),
+        ("Run", "run", None, "Run on selected meshes; ask for textures only when needed"),
         ("Undo", "undo", "undo", "Undo the last material batch"),
         ("Shading", "toggle_workspace", "workspace", "Switch between shading and scene workspaces"),
         ("Graph", "graph", "graph", "Graph selected meshes in the shading workspace"),
     )
     for label, action, icon_name, description in actions:
-        if action in ("apply", "toggle_workspace"):
+        if action == "toggle_workspace":
             cmds.separator(
                 "MaterializerShelfDivider_" + action,
                 parent="Materializer",
@@ -182,8 +178,8 @@ def install(open_toolbar=True):
             label=label,
             image=str(image_path),
             style="iconOnly",
-            width=34,
-            height=34,
+            width=42,
+            height=38,
             annotation="Materializer: " + description,
             sourceType="python",
             command=prefix + f"materializer.launch({action!r})",
