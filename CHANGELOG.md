@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/handlemotion/materializer/compare/v0.2.2...v0.3.0) (2026-11-14)
+
+
+### Features
+
+* support UDIM texture sets and viewport previews ([6ca1de4](https://github.com/handlemotion/materializer/commit/6ca1de48b504aff4b23e0ed7430088d985ec0441))
+
 ## [0.2.2](https://github.com/handlemotion/materializer/compare/v0.2.1...v0.2.2) (2026-11-14)
 
 
