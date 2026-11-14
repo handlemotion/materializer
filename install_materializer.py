@@ -135,6 +135,10 @@ def install(open_toolbar=True):
         if not cmds.shelfLayout(tab, exists=True):
             continue
         for button in cmds.shelfLayout(tab, query=True, childArray=True) or []:
+            if cmds.objectTypeUI(button) == "separator":
+                if button.rsplit("|", 1)[-1].startswith("MaterializerShelfDivider_"):
+                    cmds.deleteUI(button)
+                continue
             if cmds.objectTypeUI(button) != "shelfButton":
                 continue
             note = cmds.shelfButton(button, query=True, annotation=True)
@@ -147,13 +151,21 @@ def install(open_toolbar=True):
     actions = (
         ("Scan", "scan", None, "Scan selected meshes and review texture assignments"),
         ("Textures", "folder", "folder", "Choose textures for a scanned material"),
+        ("Review", "materials", "review", "Review meshes, materials and texture files"),
         ("Apply", "apply", "apply", "Apply checked texture assignments"),
         ("Undo", "undo", "undo", "Undo the last material batch"),
         ("Shading", "toggle_workspace", "workspace", "Switch between shading and scene workspaces"),
-        ("Graph", "graph", "inspect", "Graph selected meshes in the shading workspace"),
-        ("Review", "materials", "inspect", "Review meshes, materials and texture files"),
+        ("Graph", "graph", "graph", "Graph selected meshes in the shading workspace"),
     )
     for label, action, icon_name, description in actions:
+        if action in ("apply", "toggle_workspace"):
+            cmds.separator(
+                "MaterializerShelfDivider_" + action,
+                parent="Materializer",
+                style="shelf",
+                horizontal=False,
+                width=8,
+            )
         if icon_name:
             button_icon = module.toolbar_icon(icon_name, ready=action == "apply")
         else:
@@ -169,7 +181,9 @@ def install(open_toolbar=True):
             enable=action not in ("apply", "undo"),
             label=label,
             image=str(image_path),
-            imageOverlayLabel=label,
+            style="iconOnly",
+            width=34,
+            height=34,
             annotation="Materializer: " + description,
             sourceType="python",
             command=prefix + f"materializer.launch({action!r})",

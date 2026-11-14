@@ -832,7 +832,9 @@ def toolbar_icon(name, ready=False):
     from PySide6 import QtSvg
 
     shapes = {
-        "workspace": '<rect x="3" y="5" width="26" height="22" rx="2"/><path d="M10 5v22M10 16h19" fill="none" stroke="#d5ebff" stroke-width="2"/>',
+        "workspace": '<circle cx="16" cy="16" r="12"/><path d="M16 4a12 12 0 0 0 0 24z" fill="#d5ebff" stroke="#d5ebff"/><ellipse cx="16" cy="16" rx="5" ry="12" fill="none" stroke="#37749f"/>',
+        "graph": '<path d="M10 8h5v16h7M15 16h7" fill="none" stroke="#7cbbe7" stroke-width="3"/><rect x="2" y="3" width="10" height="10" rx="2"/><rect x="21" y="11" width="9" height="9" rx="2"/><rect x="21" y="22" width="9" height="8" rx="2"/>',
+        "review": '<rect x="4" y="3" width="18" height="24" rx="3"/><path d="M8 9h10M8 14h8" fill="none" stroke="#d5ebff" stroke-width="2"/><path d="m24 24 5 5" fill="none" stroke="#7cbbe7" stroke-width="4"/><circle cx="21" cy="21" r="6" fill="#303e4d" stroke="#a3d8fa" stroke-width="2.5"/>',
         "folder": '<path d="M4 9V4h10l3 4h11v20H4z"/><path d="M4 12h24l-3 16H4z"/>',
         "undo": '<path d="M13 5 3 14l10 8v-6h5c5 0 7 3 7 8 5-7 2-14-7-14h-5z"/>',
         "inspect": '<rect x="5" y="4" width="22" height="24" rx="3"/><path d="M10 10h12M10 16h12M10 22h9" fill="none" stroke="#d5ebff" stroke-width="2"/>',
