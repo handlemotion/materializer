@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/handlemotion/materializer/compare/v0.3.0...v0.4.0) (2026-11-14)
+
+
+### Features
+
+* add native shading workspace and shelf actions ([131fb0e](https://github.com/handlemotion/materializer/commit/131fb0e632f6515f842dfefcb014096068b101f3))
+* simplify Run and Undo and use native material graph ([a52fd41](https://github.com/handlemotion/materializer/commit/a52fd4192ddadabefaed801379fbb050501e6812))
+
+
+### Bug Fixes
+
+* group native shelf actions with distinct unlabeled icons ([f5692a6](https://github.com/handlemotion/materializer/commit/f5692a62b33885bd2c852dae0dc26d6025218a9d))
+
 ## [0.3.0](https://github.com/handlemotion/materializer/compare/v0.2.2...v0.3.0) (2026-11-14)
 
 
