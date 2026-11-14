@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/handlemotion/materializer/compare/v0.2.0...v0.2.1) (2026-11-14)
+
+
+### Bug Fixes
+
+* preserve Maya workspace placement during restoration ([d0af782](https://github.com/handlemotion/materializer/commit/d0af78262bf3a089c0b545ce4dfc1943ec4ed8a4))
+
 ## [0.2.0](https://github.com/handlemotion/materializer/compare/v0.1.0...v0.2.0) (2026-11-12)
 
 
