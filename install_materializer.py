@@ -8,7 +8,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-MODULES = ("materializer_core.py", "materializer.py")
+MODULES = ("materializer_core.py", "materializer_workspaces.py", "materializer.py")
 
 
 def install_files(source, target):
@@ -119,13 +119,16 @@ def install(open_toolbar=True):
     if folder in sys.path:
         sys.path.remove(folder)
     sys.path.insert(0, folder)
-    for name in ("materializer", "materializer_core"):
+    for name in ("materializer", "materializer_core", "materializer_workspaces"):
         sys.modules.pop(name, None)
     for name in MODULES:
         for cached in (target / "__pycache__").glob(Path(name).stem + ".*.pyc"):
             cached.unlink()
     importlib.invalidate_caches()
     module = importlib.import_module("materializer")
+    from materializer_workspaces import install_menu
+
+    install_menu(cmds, replace=True)
     legacy_module = target.parent / "material_assistant_tool" / "material_assistant.py"
     if legacy_module.is_file():
         shim = f"import sys\np={folder!r}\nif p not in sys.path: sys.path.insert(0,p)\nfrom materializer import launch, show, toolbar, shutdown\n\ndef restore_workspace():\n    import maya.cmds as cmds\n    from PySide6 import QtCore\n    def remove_legacy_dock():\n        name='MaterialAssistantQuickBarWorkspaceControl'\n        if cmds.workspaceControl(name,query=True,exists=True): cmds.deleteUI(name)\n    QtCore.QTimer.singleShot(0,remove_legacy_dock)\n    return launch()\n"

@@ -828,6 +828,7 @@ def toolbar_icon(name, ready=False):
     from PySide6 import QtSvg
 
     shapes = {
+        "workspace": '<rect x="3" y="5" width="26" height="22" rx="2"/><path d="M10 5v22M10 16h19" fill="none" stroke="#d5ebff" stroke-width="2"/>',
         "folder": '<path d="M4 9V4h10l3 4h11v20H4z"/><path d="M4 12h24l-3 16H4z"/>',
         "undo": '<path d="M13 5 3 14l10 8v-6h5c5 0 7 3 7 8 5-7 2-14-7-14h-5z"/>',
         "inspect": '<rect x="5" y="4" width="22" height="24" rx="3"/><path d="M10 10h12M10 16h12M10 22h9" fill="none" stroke="#d5ebff" stroke-width="2"/>',
@@ -1102,6 +1103,12 @@ class QuickBar(MayaQWidgetDockableMixin, QtWidgets.QWidget):
         )
         self.apply.setIcon(toolbar_icon("apply", ready=False))
         self.undo = button("Undo last material batch", pix.SP_ArrowBack, controller.undo_last)
+        self.mode = button(
+            "Switch scene / shading workspace",
+            pix.SP_DesktopIcon,
+            lambda: launch("toggle_workspace"),
+        )
+        self.mode.setIcon(toolbar_icon("workspace"))
         self.label = AssignmentLabel("Select props · scan")
         self.label.setMinimumWidth(160)
         self.label.setMaximumWidth(260)
@@ -1143,6 +1150,10 @@ class QuickBar(MayaQWidgetDockableMixin, QtWidgets.QWidget):
         floating = menu.addAction("Float toolbar")
         inspector = menu.addAction("Open inspector…")
         menu.addSeparator()
+        shading = menu.addAction("Shading workspace")
+        scene = menu.addAction("Return to scene workspace")
+        graph = menu.addAction("Graph selected meshes")
+        menu.addSeparator()
         importer = menu.addAction("Import static FBX…")
         updates = menu.addAction("Downloads and updates…")
         action = menu.exec(self.mapToGlobal(point))
@@ -1158,6 +1169,12 @@ class QuickBar(MayaQWidgetDockableMixin, QtWidgets.QWidget):
                 )
         elif action == inspector:
             self.open_inspector()
+        elif action == shading:
+            launch("shading")
+        elif action == scene:
+            launch("scene")
+        elif action == graph:
+            launch("graph")
         elif action == importer:
             choose_static_fbx()
         elif action == updates:
@@ -1459,7 +1476,49 @@ def choose_static_fbx():
         cmds.warning(str(error))
 
 
+_WORKSPACES = None
+
+
+def workspaces():
+    global _WORKSPACES
+    if _WORKSPACES is None:
+        import maya.mel as mel
+
+        from materializer_workspaces import WorkspaceSwitch, build_layout
+
+        _WORKSPACES = WorkspaceSwitch(cmds, preferences(), lambda: build_layout(cmds, mel))
+    return _WORKSPACES
+
+
+def switch_workspace(action):
+    from materializer_workspaces import SHADING, graph_selection
+
+    manager = workspaces()
+    if action == "toggle_workspace":
+        action = "scene" if manager.current() == SHADING else "shading"
+    if action == "scene":
+        manager.leave()
+    else:
+        manager.enter()
+    if action == "graph":
+        graph_selection(cmds)
+    bar = toolbar()
+    control = bar.objectName() + "WorkspaceControl"
+    if cmds.workspaceControl(control, query=True, exists=True):
+        cmds.workspaceControl(control, edit=True, restore=True, visible=True)
+    return bar
+
+
 def launch(action="materials"):
+    from materializer_workspaces import install_menu
+
+    install_menu(cmds)
+    if action in ("shading", "scene", "graph", "toggle_workspace"):
+        try:
+            return switch_workspace(action)
+        except Exception as error:
+            cmds.warning(str(error))
+            return None
     if action == "import":
         return choose_static_fbx()
     if action == "materials":

@@ -1,6 +1,6 @@
 # Development
 
-The two modules use Maya’s bundled Python and PySide6. The minimum is Maya 2026, Python 3.11 and Qt 6.5.3. No packages need installing in Maya.
+The three modules use Maya’s bundled Python and PySide6. The minimum is Maya 2026, Python 3.11 and Qt 6.5.3. No packages need installing in Maya.
 
 Run the portable checks from the repository root.
 
@@ -39,3 +39,11 @@ Use Conventional Commits, such as `fix: ...` or `feat: ...`. After main passes C
 Review and merge that PR when its checks pass. After the merged commit passes Checks, release-please creates a draft release. The publish job builds the ZIP, uploads it with the SHA-256 file and publishes the release. A failed publish leaves the draft intact; rerun that failed job. No bot merges PRs automatically.
 
 There’s no automatic code download inside Maya. Users update by running the installer from the new release ZIP.
+
+## Shading workspace
+
+`materializer_workspaces.py` uses `workspaceLayoutManager` and `workspaceControl`. It creates **Materializer Shading** on the first explicit switch, using Maya's rendering workspace as a base, then reuses the saved layout. The previous workspace name lives in Materializer's existing settings. Missing layouts and failed switches leave a route back through Maya's workspace selector.
+
+Workspace restoration must not rearrange controls. Keep docking in the explicit first-entry builder; the toolbar's restore callback only embeds its widget and constrains its row. Do not reparent native top-level windows, hide Maya's main window, or add startup scripts, scene script nodes or polling to make mode switching work.
+
+Portable tests cover unsaved layouts, repeat entry, module reload, manual workspace changes, failure recovery and component selection after graph errors. These checks do not prove native panel placement or OS window behavior. Before releasing, check entry, graphing and return in interactive Maya 2026/2027 on macOS and Windows.
