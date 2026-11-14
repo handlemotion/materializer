@@ -1497,8 +1497,10 @@ def restore_workspace():
     if parent and pointer:
         OpenMayaUI.MQtUtil.addWidgetToMayaLayout(int(pointer), int(parent))
     embed_toolbar(bar)
-    if not cmds.workspaceControl(bar.objectName() + "WorkspaceControl", query=True, floating=True):
-        arrange_toolbar(bar)
+    # Maya is still assembling the saved docking layout. Moving this control here
+    # creates a temporary floating panel that Maya later empties but cannot close.
+    # Leave placement to Maya; only constrain geometry after restoration returns.
+    QtCore.QTimer.singleShot(0, lambda: fit_toolbar_row(bar) if isValid(bar) else None)
     bar.timer.start(200)
     return bar
 
