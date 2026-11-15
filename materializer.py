@@ -883,6 +883,7 @@ def toolbar_icon(name, ready=False):
     from PySide6 import QtSvg
 
     shapes = {
+        "run": '<path d="M4 14A12 12 0 0 1 25 7l4-4v13H16l5-5a6 6 0 0 0-11 3z"/><path d="M28 18A12 12 0 0 1 7 25l-4 4V16h13l-5 5a6 6 0 0 0 11-3z"/>',
         "workspace": '<circle cx="16" cy="16" r="12"/><path d="M16 4a12 12 0 0 0 0 24z" fill="#d5ebff" stroke="#d5ebff"/><ellipse cx="16" cy="16" rx="5" ry="12" fill="none" stroke="#37749f"/>',
         "graph": '<path d="M10 8h5v16h7M15 16h7" fill="none" stroke="#7cbbe7" stroke-width="3"/><rect x="2" y="3" width="10" height="10" rx="2"/><rect x="21" y="11" width="9" height="9" rx="2"/><rect x="21" y="22" width="9" height="8" rx="2"/>',
         "review": '<rect x="4" y="3" width="18" height="24" rx="3"/><path d="M8 9h10M8 14h8" fill="none" stroke="#d5ebff" stroke-width="2"/><path d="m24 24 5 5" fill="none" stroke="#7cbbe7" stroke-width="4"/><circle cx="21" cy="21" r="6" fill="#303e4d" stroke="#a3d8fa" stroke-width="2.5"/>',
