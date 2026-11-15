@@ -79,7 +79,7 @@ def install(open_toolbar=True):
     if cmds.about(apiVersion=True) < 20260000:
         raise RuntimeError("Materializer requires Maya 2026 or newer.")
 
-    from PySide6 import QtCore, QtWidgets
+    from PySide6 import QtCore
 
     source = Path(__file__).resolve().parent
     for name in MODULES:
@@ -147,8 +147,9 @@ def install(open_toolbar=True):
             cmds.deleteUI(tab)
     if not cmds.shelfLayout("Materializer", exists=True):
         cmds.shelfLayout("Materializer", parent=shelves)
+    cmds.shelfLayout("Materializer", edit=True, spacing=8)
     actions = (
-        ("Run", "run", None, "Run on selected meshes; ask for textures only when needed"),
+        ("Run", "run", "run", "Run on selected meshes; ask for textures only when needed"),
         ("Undo", "undo", "undo", "Undo the last material batch"),
         ("Shading", "toggle_workspace", "workspace", "Switch between shading and scene workspaces"),
         ("Graph", "graph", "graph", "Graph selected meshes in the shading workspace"),
@@ -160,14 +161,9 @@ def install(open_toolbar=True):
                 parent="Materializer",
                 style="shelf",
                 horizontal=False,
-                width=8,
+                width=16,
             )
-        if icon_name:
-            button_icon = module.toolbar_icon(icon_name, ready=action == "apply")
-        else:
-            button_icon = QtWidgets.QApplication.style().standardIcon(
-                QtWidgets.QStyle.StandardPixmap.SP_BrowserReload
-            )
+        button_icon = module.toolbar_icon(icon_name)
         image_path = target / ("materializer_" + action + ".png")
         if not button_icon.pixmap(64, 64).save(str(image_path)):
             raise RuntimeError("Could not save the " + label + " shelf icon.")
