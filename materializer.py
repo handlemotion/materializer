@@ -25,7 +25,7 @@ from materializer_core import (
     udim_path,
 )
 
-__version__ = "0.4.0"  # x-release-please-version
+__version__ = "0.5.0"  # x-release-please-version
 
 
 LEGACY = {"phong", "blinn", "lambert", "surfaceShader", "phongE"}
