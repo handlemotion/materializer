@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/handlemotion/materializer/compare/v0.4.0...v0.5.0) (2026-11-15)
+
+
+### Bug Fixes
+
+* space shelf groups and unify Run icon blue ([006156d](https://github.com/handlemotion/materializer/commit/006156da1adabdbbd4fbf2e86d449862529706fb))
+
 ## [0.4.0](https://github.com/handlemotion/materializer/compare/v0.3.0...v0.4.0) (2026-11-14)
 
 
