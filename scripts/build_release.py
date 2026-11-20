@@ -11,6 +11,7 @@ FILES = (
     "materializer.py",
     "materializer_core.py",
     "materializer_workspaces.py",
+    "materializer_bar.py",
     "README.md",
     "LICENSE",
     "CHANGELOG.md",

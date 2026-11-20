@@ -1580,7 +1580,11 @@ def launch(action="run"):
     if action == "import":
         return choose_static_fbx()
     if action == "toolbar":
-        return toolbar()
+        try:
+            import materializer_bar
+            return materializer_bar.show()
+        except ImportError:
+            return toolbar()
     if action == "undo":
         window = controller()
         if window.undo_last():

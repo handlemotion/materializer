@@ -8,7 +8,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-MODULES = ("materializer_core.py", "materializer_workspaces.py", "materializer.py")
+MODULES = (
+    "materializer_core.py",
+    "materializer_workspaces.py",
+    "materializer.py",
+    "materializer_bar.py",
+)
 
 
 def install_files(source, target):
@@ -109,7 +114,7 @@ def install(open_toolbar=True):
     if folder in sys.path:
         sys.path.remove(folder)
     sys.path.insert(0, folder)
-    for name in ("materializer", "materializer_core", "materializer_workspaces"):
+    for name in ("materializer", "materializer_core", "materializer_workspaces", "materializer_bar"):
         sys.modules.pop(name, None)
     for name in MODULES:
         for cached in (target / "__pycache__").glob(Path(name).stem + ".*.pyc"):
